@@ -1,0 +1,8 @@
+targets:
+  - [18, 5]  # Target 1: Nella parte bassa del lago (ampia e completamente vuota)
+  - [-5, 2]   # Target 2: Spazio aperto a sinistra, sotto le due boe appaiate
+  - [15.0, 15.0]   # Target 3: In alto a destra, ben oltre la boa superiore
+  - [10, -25]
+  - [-5, 15]
+  - [-7, -17]
+

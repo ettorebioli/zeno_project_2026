@@ -1,0 +1,48 @@
+# Origin coordinates of the map
+origin:
+  coordinates:
+    latitude:   43.70668436597731
+    longitude:  10.475651060240478
+    depth:      0.0
+
+zeno:
+  # Zeno initial pose w.r.t the fixed frame
+  init_pose:
+    north:    10.0    # m
+    east:     1.0     # m
+    depth:    0.0     # m
+    yaw:      0.0     # deg
+
+  # Zeno maximum velocities
+  # (DON'T CHANGE THIS VALUES)
+  vel_max:
+    surge:  0.2   # m/s
+    sway:   0.2   # m/s
+    heave:  0.125 # m/s
+    omega:  10    # deg/s
+
+  # Zeno gains for the P controller
+  # (DON'T CHANGE THIS VALUES)
+  P_controller:
+    yaw:    0.20
+    omega:  0.50
+    surge:  0.25
+    sway:   0.25
+    depth:  0.01
+    heave:  0.1
+
+# WAYPOINT w.r.t the fixed frame
+waypoints:
+  - [11.0, 2.0] #(North , East ) [m]
+  - [11.0, 22.0]
+  - [21.0, 23.0]
+  - [21.0, 2.0]
+  - [31.0, 2.0]
+  - [31.0, 23.0]
+  - [41.0, 22.0]
+  - [41.0, 2.0]
+       
+        
+# ORIGINE LAGHETTI
+# RANGE PROFONDITÀ LAGHETTI
+# EVENTUALE GRIDMAP
