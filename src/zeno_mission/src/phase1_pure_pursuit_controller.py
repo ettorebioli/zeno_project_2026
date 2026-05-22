@@ -4,11 +4,18 @@
 import rospy
 import math
 import sys
+import csv
+import os
+import rospkg
+import time
 import numpy as np
 
 from marta_msgs.msg import NavStatus
 from joystick_command.msg import Rel_error_joystick
 from geodetic_functions import ll2ne
+from std_msgs.msg import String
+
+
 
 class Phase1Controller:
 
@@ -60,6 +67,30 @@ class Phase1Controller:
         self.joystic_pub = rospy.Publisher("/relative_error", Rel_error_joystick, queue_size=1)
         rospy.Subscriber("/nav_status", NavStatus, self.nav_callback)
 
+        self.telemetry_pub = rospy.Publisher("/phase1/telemetry", String, queue_size=1)
+
+        # Setup cartella logs
+        rospack = rospkg.RosPack()
+        pkg_path = rospack.get_path('zeno_mission') # Usa il nome del tuo pacchetto
+        log_dir = os.path.join(pkg_path, 'logs')
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
+        # Creazione del file con Timestamp
+        timestamp_str = time.strftime("%Y%m%d_%H%M%S")
+        self.csv_path = os.path.join(log_dir, "phase1_log_{}.csv".format(timestamp_str))
+        self.csv_file = open(self.csv_path, mode='w')
+        self.csv_writer = csv.writer(self.csv_file, delimiter=',')
+        
+        # Scrittura dell'Intestazione del CSV
+        self.csv_writer.writerow([
+            "Time_sec ", " Lat ", " Lon ", " Yaw_deg ", " North_m ", " East_m ", 
+            " Target_WP_idx ", " Dist_to_WP_m ", " CrossTrackErr_m ", 
+            " Surge_Cmd ", " Yaw_Cmd_deg ", " Event"
+        ])
+        rospy.loginfo("Data Logger avviato. File: %s", self.csv_path)    
+
+
         self.timer = rospy.Timer(rospy.Duration(0.1), self.control_loop) # Loop a 10Hz
         rospy.on_shutdown(self.on_shutdown_hook)
 
@@ -77,10 +108,10 @@ class Phase1Controller:
 
         current_n, current_e = ll2ne(self.origin, (self.current_lat, self.current_lon))
 
+        #varibaile per registre eventi 
+        event_msg = ""
+
         # AVVIO MISSIONE (se non ancora avviata )
-        # =======================================================
-        # 3. LOGICA DI AVVIO MISSIONE E SMART START
-        # =======================================================
         if not self.mission_started:
             
             # Quanti waypoint abbiamo?
@@ -103,20 +134,22 @@ class Phase1Controller:
                 # si prende la prima occorrenza 
                 best_corner = distances.index(min_dist)
 
-                # 2. Riordino della lista in base al corner più vicino
+                event_msg = "Smart Start: Corner {} scelto".format(best_corner)
+
+                # Riordino della lista in base al corner più vicino
                 if best_corner == 0:
-                    #ordine attuale dei wp 
+                    event_msg = "Smart Start: Corner 0 (Inizio Originale)."
                     
                 elif best_corner == 1:
-                    # Trasforma in coppie -> inverte le colonne (sx-dx) -> riporta a lista
-                    self.waypoints = self.waypoints.reshape(-1, 2, 2)[:, ::-1].reshape(-1, 2)
+                    event_msg = "Smart Start: Corner 1 (Inversione sx-dx)."
+                    self.waypoints = self.waypoints.reshape(-1, 2, 2)[:, ::-1, :].reshape(-1, 2)
                     
                 elif best_corner == 2:
-                    # Trasforma in coppie -> inverte l'ordine delle righe -> riporta a lista
+                    event_msg = "Smart Start: Corner 2 (Partenza dal fondo)."
                     self.waypoints = self.waypoints.reshape(-1, 2, 2)[::-1, :, :].reshape(-1, 2)
                     
                 elif best_corner == 3:
-                    # Capovolge l'intera lista
+                    event_msg = "Smart Start: Corner 3 (Inversione Totale)."
                     self.waypoints = self.waypoints[::-1]
                 
                 dist_to_start = min_dist
@@ -125,14 +158,16 @@ class Phase1Controller:
             
             # Se siamo lontani, tracciamo la rotta per avvicinarci a wp[0]
             if dist_to_start > 1.0:
-                rospy.loginfo("Generazione punto di rientro (Zeno -> Start Point).")
                 self.waypoints = np.vstack([[current_n, current_e], self.waypoints])
+                event_msg += " | Inserito WP Rientro"
 
             #rospy.set_param("waypoints_phase1_active", self.waypoints.tolist())
 
             self.t_start = rospy.Time.now()
             self.mission_started = True
             rospy.loginfo("MISSIONE FASE 1 INIZIATA! Zeno in movimento.")
+
+            self.log_state(current_n, current_e, 0.0, 0.0, 0.0, 0.0, event_msg)
             return # Al prossimo ciclo parte effettivamente la missione 
 
         # Aggiornamento distanza percorsa
@@ -143,7 +178,6 @@ class Phase1Controller:
         self.last_e = current_e
 
         # CHECK FINE MISSIONE
-    
         if self.current_wp_idx >= len(self.waypoints) - 1:
 
             # messaggio di stop 
@@ -157,12 +191,24 @@ class Phase1Controller:
             rospy.loginfo("Tempo di missione: %.2f secondi", mission_time)
             rospy.loginfo("Distanza totale percorsa: %.2f metri", self.total_distance)
             rospy.loginfo("==============================================")
-            
+
+            #riepilogo missione, scatola nera 
+            if not self.csv_file.closed:
+                self.csv_writer.writerow([
+                    "{:.2f}".format(mission_time),  # Time_sec
+                    "", "", "", "", "",             # Lat, Lon, Yaw, North, East vuoti
+                    "",                             # Target_WP_idx vuoto
+                    "{:.2f}".format(self.total_distance), # campo della distanza per idnicare la distanza totale 
+                    "", "", "",                     # CrossTrack, Surge, Yaw_cmd vuoti
+                    "RIEPILOGO: Missione completata con successo! Distanza totale: {:.2f}m, Tempo: {:.2f}s".format(self.total_distance, mission_time)
+                ])
+
+         
             rospy.signal_shutdown("Fase 1 terminata con successo.")
             return
 
-        # CONTROLLO PURE PURSUIT
 
+        # CONTROLLO 
         wp_start = self.waypoints[self.current_wp_idx]
         wp_end = self.waypoints[self.current_wp_idx + 1]
 
@@ -207,11 +253,14 @@ class Phase1Controller:
 
         # Distanza da fine segmento
         dist = math.sqrt((wp_end_n - current_n)**2 + (wp_end_e - current_e)**2)
-        rospy.loginfo_throttle(1.0, "Distanza al WP %d: %.2f m", self.current_wp_idx + 1, dist)
+        #rospy.loginfo_throttle(1.0, "Distanza al WP %d: %.2f m", self.current_wp_idx + 1, dist)
 
         # Transizione Waypoint
         if dist < self.position_th or t >= 1.0:
-            rospy.loginfo("Waypoint %d raggiunto.", self.current_wp_idx + 1)
+            #rospy.loginfo("Waypoint %d raggiunto.", self.current_wp_idx + 1)
+            event_msg = "WP {} Reached".format(self.current_wp_idx + 1)
+            self.log_state(current_n, current_e, dist, error_track, 0.0, 0.0, event_msg)
+
             self.current_wp_idx += 1
             return
 
@@ -235,12 +284,45 @@ class Phase1Controller:
 
         self.joystic_pub.publish(cmd)
 
+        self.log_state(current_n, current_e, dist, error_track, surge, yaw_error_deg, event_msg)
+
+
     def wrapToPi(self, angle):
         return (angle + np.pi) % (2 * np.pi) - np.pi
 
     def on_shutdown_hook(self):
         #Se controllo viene killato (Ctrl+C) diamo comuqnue il comando di STOP a zeno 
         self.joystic_pub.publish(Rel_error_joystick(error_surge_speed=0.0, error_yaw=0.0))
+
+        # Chiude e salva il file CSV in modo pulito
+        if not self.csv_file.closed:
+            self.csv_file.close()
+            rospy.loginfo("Scatola Nera salvata con successo.")
+
+    def log_state(self, current_n, current_e, dist, error_track, surge, yaw_error_deg, event_msg):
+        
+        telemetry_str = "WP: {}/{} | Dist: {:.2f}m | X-Track: {:.2f}m | Surge: {:.2f} | YawErr: {:.1f} deg".format(
+            self.current_wp_idx + 1, len(self.waypoints), dist, error_track, surge, yaw_error_deg
+        )
+        self.telemetry_pub.publish(String(data=telemetry_str))
+
+        # 2. Scrittura CSV
+        current_time = (rospy.Time.now() - self.t_start).to_sec() if self.t_start else 0.0
+        self.csv_writer.writerow([
+            "{:.2f}  ".format(current_time),
+            "{:.6f}  ".format(self.current_lat),
+            "{:.6f}  ".format(self.current_lon),
+            "{:.2f}  ".format(math.degrees(self.current_yaw)),
+            "{:.2f}  ".format(current_n),
+            "{:.2f}  ".format(current_e),
+            self.current_wp_idx + 1,
+            "{:.2f}  ".format(dist),
+            "{:.2f}  ".format(error_track),
+            "{:.2f}  ".format(surge),
+            "{:.2f}  ".format(yaw_error_deg),
+            event_msg
+        ])
+
 
 if __name__ == "__main__":
     try:
