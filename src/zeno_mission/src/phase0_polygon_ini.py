@@ -155,6 +155,7 @@ def save_params_to_yaml(origin_ll, poly_orig, poly_rest):
 
 # --- SCRIPT EXECUTION ---
 if __name__ == "__main__":
+
     rospy.init_node("polygon_ini", anonymous=True)
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -181,7 +182,7 @@ if __name__ == "__main__":
         plt.figure(figsize=(8, 7))
         
         
-        plt.scatter(points_ned[:, 1], points_ned[:, 0], color='red', s=80, zorder=5, label='VErtici')
+        plt.scatter(points_ned[:, 1], points_ned[:, 0], color='red', s=80, zorder=5, label='Vertici')
         
         # Chiusura dei perimetri per la rappresentazione grafica
         plot_orig = np.vstack([poly_original, poly_original[0]])

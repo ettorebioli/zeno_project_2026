@@ -217,7 +217,7 @@ if __name__ == "__main__":
         plt.figure(figsize=(8, 7))
         
         plot_poly = np.vstack([restricted_poly, restricted_poly[0]])
-        plt.plot(plot_poly[:, 1], plot_poly[:, 0], 'g--s', linewidth=2, label='Restricted Polygon')
+        plt.plot(plot_poly[:, 1], plot_poly[:, 0], 'g--s', linewidth=2, label='Perimetro Ristretto')
         
         wp_plot = np.array(waypoints_ned)
         plt.plot(wp_plot[:, 1], wp_plot[:, 0], 'b-o', linewidth=2, label='Coverage Path')
