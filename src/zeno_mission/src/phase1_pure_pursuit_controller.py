@@ -302,7 +302,7 @@ class Phase1Controller:
     def log_state(self, current_n, current_e, dist, error_track, surge, yaw_error_deg, event_msg):
         
         telemetry_str = "WP: {}/{} | Dist: {:.2f}m | X-Track: {:.2f}m | Surge: {:.2f} | YawErr: {:.1f} deg".format(
-            self.current_wp_idx + 1, len(self.waypoints), dist, error_track, surge, yaw_error_deg
+            self.current_wp_idx + 1, len(self.waypoints)-1, dist, error_track, surge, yaw_error_deg
         )
         self.telemetry_pub.publish(String(data=telemetry_str))
 
