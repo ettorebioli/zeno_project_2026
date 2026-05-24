@@ -46,21 +46,21 @@ def save_final_plot_on_shutdown():
         rospack = rospkg.RosPack()
         pkg_path = rospack.get_path('zeno_mission') 
         
-        # 2. Gestione cartella 'img'
+        
         img_dir = os.path.join(pkg_path, 'img')
         if not os.path.exists(img_dir):
             os.makedirs(img_dir)
             
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        image_name = "mission_phase1_{}.png".format(timestamp)
+        image_name = "mission_phase1_{}.pdf".format(timestamp)
         image_path = os.path.join(img_dir, image_name)
         
-        plt.gcf().savefig(image_path, dpi=800, bbox_inches='tight')
+        plt.gcf().savefig(image_path, format='pdf', bbox_inches='tight')
         
-        rospy.loginfo("Immagine di missione salvata con successo in: %s", image_path)
+        rospy.loginfo("Grafico di missione salvata con successo in: %s", image_path)
         
     except Exception as e:
-        rospy.logwarn("Impossibile salvare l'immagine finale durante lo shutdown: %s", str(e))        
+        rospy.logwarn("Impossibile salvare grafico finale durante lo shutdown: %s", str(e))        
 
 
 def listener():
@@ -69,7 +69,7 @@ def listener():
 
     rospy.init_node("phase1_plot", anonymous=True)
 
-    rospy.on_shutdown(save_final_plot_on_shutdown)
+   
 
 
     # CARICAMENTO PARAMETRI 
@@ -148,10 +148,11 @@ def listener():
         ax.grid(True, linestyle=':', alpha=0.7)
         ax.legend(loc='upper right', fontsize=9)
 
-        #
         plt.pause(0.05)
         rate.sleep()
 
+    #Salvataggio plot
+    save_final_plot_on_shutdown()
 
 # ENTRY POINT
 

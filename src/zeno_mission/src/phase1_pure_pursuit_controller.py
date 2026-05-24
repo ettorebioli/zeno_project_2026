@@ -101,6 +101,10 @@ class Phase1Controller:
 
     def control_loop(self, event):
 
+        if rospy.is_shutdown():
+            return
+
+
         # ATTESA PRIMO SEGNALE GPS
         if None in (self.current_lat, self.current_lon, self.current_yaw):
             rospy.loginfo_throttle(5.0, "Attesa dati GPS / NavStatus...") #Stampo ogni 5 Secondi 
@@ -306,22 +310,30 @@ class Phase1Controller:
         )
         self.telemetry_pub.publish(String(data=telemetry_str))
 
-        # 2. Scrittura CSV
-        current_time = (rospy.Time.now() - self.t_start).to_sec() if self.t_start else 0.0
-        self.csv_writer.writerow([
-            "{:.2f}  ".format(current_time),
-            "{:.6f}  ".format(self.current_lat),
-            "{:.6f}  ".format(self.current_lon),
-            "{:.2f}  ".format(math.degrees(self.current_yaw)),
-            "{:.2f}  ".format(current_n),
-            "{:.2f}  ".format(current_e),
-            self.current_wp_idx + 1,
-            "{:.2f}  ".format(dist),
-            "{:.2f}  ".format(error_track),
-            "{:.2f}  ".format(surge),
-            "{:.2f}  ".format(yaw_error_deg),
-            event_msg
-        ])
+        # Scrittura CSV
+        try:
+            if not self.csv_file.closed:
+                current_time = (rospy.Time.now() - self.t_start).to_sec() if self.t_start else 0.0
+                self.csv_writer.writerow([
+                    "{:.2f}  ".format(current_time),
+                    "{:.6f}  ".format(self.current_lat),
+                    "{:.6f}  ".format(self.current_lon),
+                    "{:.2f}  ".format(math.degrees(self.current_yaw)),
+                    "{:.2f}  ".format(current_n),
+                    "{:.2f}  ".format(current_e),
+                    self.current_wp_idx + 1,
+                    "{:.2f}  ".format(dist),
+                    "{:.2f}  ".format(error_track),
+                    "{:.2f}  ".format(surge),
+                    "{:.2f}  ".format(yaw_error_deg),
+                    event_msg
+                ])
+        except ValueError:
+    
+            pass
+
+
+        
 
 
 if __name__ == "__main__":
