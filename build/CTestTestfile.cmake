@@ -7,5 +7,5 @@
 subdirs("gtest")
 subdirs("marta_msgs")
 subdirs("joystick_command")
-subdirs("zeno_python")
+subdirs("zeno_mission")
 subdirs("zeno_sim_pkg")

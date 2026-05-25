@@ -1,8 +1,0 @@
-prefix=/home/student/catkin_ws/install
-
-Name: zeno_python
-Description: Description of zeno_python
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 
