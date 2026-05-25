@@ -5,6 +5,7 @@ import math
 import heapq
 import numpy as np
 import matplotlib.path as mpltPath
+import time
 
 
 
@@ -13,7 +14,7 @@ from geometry_msgs.msg import Point
 # Controlla che ci sia questa riga esatta in cima al file:
 from marta_msgs.msg import NavStatus
 from zeno_python.msg import WaypointPath
-from geodetic_functions import ll2ne# --- MODIFICA QUI: Aggiunto per calcolare il TSP a forza bruta ---
+from geodetic_functions import ll2ne
 from itertools import permutations
 
 # --- PARAMETRI ---
@@ -49,11 +50,8 @@ def astar(grid, start, end):
             continue
         closed_set.add(current_node.position)
 
-        ACCEPTANCE_RADIUS_CELLS = 0.5 / RESOLUTION
-        distance_to_goal = math.sqrt((current_node.position[0] - end_node.position[0])**2 + 
-                                     (current_node.position[1] - end_node.position[1])**2)
-
-        if distance_to_goal <= ACCEPTANCE_RADIUS_CELLS:
+        # L'algoritmo si ferma SOLO quando tocca esattamente la cella finale
+        if current_node.position == end_node.position:
             path = []
             current = current_node
             is_target_node = True  # Flag per il primo nodo (che in realtà è l'ultimo della rotta)
@@ -133,32 +131,73 @@ def create_occupancy_grid(obstacles_ned, poly_ned, all_points_ned):
                     
     return grid.tolist(), min_n, min_e
 
-# --- NUOVA FUNZIONE AGGIUNTA PER IL COMMESSO VIAGGIATORE ---
-def solve_tsp(start_pos, targets):
-    """
-    Trova l'ordine ottimo dei target massimizzando l'efficienza del percorso.
-    Usa la distanza euclidea lineare come euristica per l'ordinamento.
-    """
-    best_path = None
-    min_total_distance = float('inf')
+def calculate_path_length(segment, resolution):
+    """Calcola la lunghezza in metri di un percorso A* sulla griglia."""
+    if not segment or len(segment) < 2:
+        return float('inf') # Se l'A* non trova strada, costo infinito
     
-    # Genera tutte le possibili sequenze di visita dei target
-    for p in permutations(targets):
-        current_distance = 0.0
-        # Distanza dal punto iniziale di Zeno al primo target della combinazione attuale
-        current_pos = start_pos
+    dist_totale = 0.0
+    for k in range(1, len(segment)):
+        dn = segment[k][0] - segment[k-1][0]
+        de = segment[k][1] - segment[k-1][1]
+        dist_totale += math.sqrt(dn**2 + de**2) * resolution
+    return dist_totale
+
+def solve_tsp(start_ned, targets_ned, grid, resolution, min_n, min_e):
+    """
+    Risolutore TSP Avanzato: calcola la matrice dei costi esatti 
+    usando l'A* per aggirare gli ostacoli prima di ordinare i target.
+    """
+    import itertools
+    
+    # 1. Combiniamo i punti: Indice 0 = Zeno, Indici 1..N = Target
+    all_points = [start_ned] + targets_ned
+    num_points = len(all_points)
+    
+    # 2. Inizializziamo la Matrice dei Costi
+    cost_matrix = [[0.0] * num_points for _ in range(num_points)]
+    rospy.loginfo("Generazione Matrice dei Costi A* tra %d nodi...", num_points)
+    
+    # 3. Calcoliamo i percorsi A* per ogni coppia possibile
+    for i in range(num_points):
+        for j in range(i + 1, num_points):
+            # Convertiamo le coordinate in indici griglia
+            start_idx = (int((all_points[i][0] - min_n) / resolution), int((all_points[i][1] - min_e) / resolution))
+            target_idx = (int((all_points[j][0] - min_n) / resolution), int((all_points[j][1] - min_e) / resolution))
+            
+            # Lanciamo l'A* tra questi due punti
+            segment = astar(grid, start_idx, target_idx)
+            
+            # Misuriamo i metri esatti evitando gli ostacoli
+            real_dist = calculate_path_length(segment, resolution)
+            
+            # La matrice è simmetrica: la distanza A->B è uguale a B->A
+            cost_matrix[i][j] = real_dist
+            cost_matrix[j][i] = real_dist
+
+    # 4. Applichiamo la forza bruta (TSP) sulla VERA matrice dei costi
+    best_cost = float('inf')
+    best_order_indices = None
+    
+    # Creiamo permutazioni solo per i target (indici da 1 a num_points-1)
+    target_indices = list(range(1, num_points))
+    for perm in itertools.permutations(target_indices):
+        current_cost = 0.0
+        current_node = 0 # Partiamo sempre da Zeno (Indice 0)
         
-        for target in p:
-            dist = math.sqrt((target[0] - current_pos[0])**2 + (target[1] - current_pos[1])**2)
-            current_distance += dist
-            current_pos = target
+        for next_node in perm:
+            current_cost += cost_matrix[current_node][next_node]
+            current_node = next_node
             
-        # Salva la combinazione se è la più corta trovata finora
-        if current_distance < min_total_distance:
-            min_total_distance = current_distance
-            best_path = p
+        if current_cost < best_cost:
+            best_cost = current_cost
+            best_order_indices = perm
             
-    return list(best_path), min_total_distance
+    # 5. Ricostruiamo la lista dei target ordinati con la sequenza vincente
+    ordered_targets = [all_points[idx] for idx in best_order_indices]
+    
+    rospy.loginfo("TSP Risolto! Distanza reale prevista: %.2f m", best_cost)
+    return ordered_targets, best_cost
 
 def main():
     rospy.init_node('planner_astar')
@@ -174,30 +213,46 @@ def main():
         rospy.logerr("Origine non trovata nel parameter server!")
         return
 
-    # 2. Lettura parametri gara (GIA' in NED)
+# 2. Lettura parametri gara (in coordinate GPS) e conversione in NED
     try:
-        targets_ned = rospy.get_param("/targets")
-        obstacles_ned = rospy.get_param("/obstacles")
+        targets_gps = rospy.get_param("/targets")
+        obstacles_gps = rospy.get_param("/obstacles")
+        
+        # Inizializziamo le liste vuote per il sistema NED
+        targets_ned = []
+        obstacles_ned = []
+        
+        # Conversione dei target
+        for t in targets_gps:
+            lat = t[0]
+            lon = t[1]
+            n, e = ll2ne(origin, (lat, lon))
+            targets_ned.append([n, e])
+            
+        # Conversione degli ostacoli (mantenendo il raggio)
+        for obs in obstacles_gps:
+            lat = obs[0]
+            lon = obs[1]
+            radius = obs[2]
+            n, e = ll2ne(origin, (lat, lon))
+            obstacles_ned.append([n, e, radius])
+            
     except KeyError:
         rospy.logerr("File YAML di targets o ostacoli non caricati!")
         return
 
-# 3. Lettura Poligono (Direttamente dal file fisico)
     poly_ned = []
-    # Assicurati che questo sia il percorso esatto del file txt
-    file_path = "/media/sf_ros_condivisa/src/zeno_python/src/vertici_area.txt" 
-    
+    # =========================================================
+    # 3. Lettura Poligono da YAML e conversione in NED
+    # =========================================================
     try:
-        with open(file_path, 'r') as f:
-            for line in f:
-                if line.strip():
-                    lat, lon = map(float, line.strip().split(','))
-                    # Usiamo ll2ne per convertirli subito in metri!
-                    n, e = ll2ne(origin, (lat, lon))
-                    poly_ned.append([n, e])
-        rospy.loginfo("Poligono caricato con successo dal file txt.")
-    except IOError:
-        rospy.logwarn("File vertici_area.txt non trovato. Zeno navigherà senza confini!")
+        # I vertici nel file YAML ora sono in GPS [Lat, Lon]
+        poly_ned = rospy.get_param("/polygon_vertices/restricted")
+        
+        rospy.loginfo("Poligono caricato e convertito in NED con successo.")
+    except KeyError:
+        poly_ned = []
+        rospy.logwarn("Parametro /polygon_vertices/original non trovato. Zeno navigherà senza confini!")
 
 # 4. Acquisizione Posizione Reale di Zeno dal Topic GPS
     rospy.loginfo("In attesa della posizione attuale di Zeno su /nav_status...")
@@ -210,16 +265,8 @@ def main():
     except rospy.ROSException:
         rospy.logerr("Timeout! Nessun messaggio su /nav_status")
         # Se il simulatore lagga, impostiamo un valore fittizio per NON far crashare il TSP
-        start_pos_ned = [0.0, 0.0]
+        current_pos_ned = [0.0, 0.0]
         return
-    # --- APPLICAZIONE TSP ---
-    rospy.loginfo("Calcolo dell'ordine ottimo dei target tramite TSP...")
-    ordered_targets, estimated_dist = solve_tsp(current_pos_ned, targets_ned)
-    rospy.loginfo("Ordine ottimo trovato! Distanza stimata (LOS): %.2f metri", estimated_dist)
-    
-    # Stampiamo l'ordine dei target per verifica nel terminale
-    for idx, tg in enumerate(ordered_targets):
-        rospy.loginfo(" Target %d originale -> Diventa la tappa #%d: [N: %.2f, E: %.2f]", targets_ned.index(tg)+1, idx+1, tg[0], tg[1])
 
     # Creazione griglia globale
     all_points = [current_pos_ned] + targets_ned + [[obs[0], obs[1]] for obs in obstacles_ned]
@@ -229,6 +276,29 @@ def main():
     grid, min_n, min_e = create_occupancy_grid(obstacles_ned, poly_ned, all_points)
 
     full_path_ned = []
+# --- APPLICAZIONE TSP ---
+    rospy.loginfo("Calcolo dell'ordine ottimo dei target tramite TSP...")
+    rospy.loginfo("Avvio Ottimizzatore TSP-A* (Obstacle-Aware)...")
+    
+    # ==========================================
+    # START CRONOMETRO
+    # ==========================================
+    start_time = time.time()
+    
+    ordered_targets, real_dist = solve_tsp(current_pos_ned, targets_ned, grid, RESOLUTION, min_n, min_e)
+    
+    end_time = time.time()
+    tempo_impiegato = end_time - start_time
+    # ==========================================
+    # STOP CRONOMETRO
+    # ==========================================
+
+    rospy.loginfo("Ordine ottimo trovato! Distanza: %.2f metri", real_dist)
+    rospy.loginfo("Tempo di calcolo TSP: %.2f secondi", tempo_impiegato)
+    # Stampiamo l'ordine dei target per verifica nel terminale
+    for idx, tg in enumerate(ordered_targets):
+        rospy.loginfo(" Target %d originale -> Diventa la tappa #%d: [N: %.2f, E: %.2f]", targets_ned.index(tg)+1, idx+1, tg[0], tg[1])
+
     
 # Cicliamo sui target ORDINATI dal modulo TSP
     for i, target_ned in enumerate(ordered_targets):
@@ -244,10 +314,12 @@ def main():
                 # idx ora contiene (riga, colonna, z)
                 z_flag = idx[2] 
                 
-                if j == 0:
-                    pos_m = [float(current_pos_ned[0]), float(current_pos_ned[1]), z_flag]
+                # Se è l'ultimo punto del segmento, snap esatto al target
+                if j == len(segment) - 1:
+                    pos_m = [float(target_ned[0]), float(target_ned[1]), z_flag]
                 else:
                     pos_m = [float(idx[0]*RESOLUTION + min_n), float(idx[1]*RESOLUTION + min_e), z_flag]
+
                 
                 if not full_path_ned or pos_m[:2] != full_path_ned[-1][:2]:
                     full_path_ned.append(pos_m)                    
@@ -255,9 +327,17 @@ def main():
         else:
             rospy.logerr("Impossibile raggiungere la Tappa TSP %d!" % (i+1))
 
-    # --- VERIFICA INTERNA DEI TARGET ---
-    target_trovati = sum(1 for wp in full_path_ned if wp[2] == 1.0)
-    rospy.loginfo("Verifica Z=1: Trovati %d waypoint di tipo TARGET sulla rotta!", target_trovati)
+    # =========================================================
+    # DEBUG A VIDEO: STAMPA I WAYPOINT CON Z=1
+    # =========================================================
+    rospy.loginfo("--- RICERCA WAYPOINT TARGET (Z=1.0) NELLA ROTTA ---")
+    
+    for indice, punto in enumerate(full_path_ned):
+        # punto[0] è Nord (X), punto[1] è Est (Y), punto[2] è la Z
+        if punto[2] == 1.0:
+            rospy.loginfo("Trovato Target all'indice %d! Coordinate: [X: %.2f, Y: %.2f, Z: %.1f]", 
+                          indice, punto[0], punto[1], punto[2])
+    # =========================================================
 
     if full_path_ned:
         rospy.sleep(1.0) 
