@@ -69,8 +69,6 @@ def listener():
 
     rospy.init_node("phase1_plot", anonymous=True)
 
-   
-
 
     # CARICAMENTO PARAMETRI 
     # origine 

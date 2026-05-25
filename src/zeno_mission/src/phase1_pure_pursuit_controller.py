@@ -47,6 +47,7 @@ class Phase1Controller:
         self.current_lat = None
         self.current_lon = None
         self.current_yaw = None
+        self.current_timestamp = None
 
         self.current_wp_idx = 0
         self.mission_started = False  # Flag per gestire l'allineamento iniziale
@@ -98,6 +99,7 @@ class Phase1Controller:
         self.current_lat = msg.position.latitude
         self.current_lon = msg.position.longitude
         self.current_yaw = msg.orientation.yaw
+        self.current_timestamp = msg.header.stamp
 
     def control_loop(self, event):
 
@@ -167,7 +169,7 @@ class Phase1Controller:
 
             #rospy.set_param("waypoints_phase1_active", self.waypoints.tolist())
 
-            self.t_start = rospy.Time.now()
+            self.t_start = self.current_timestamp
             self.mission_started = True
             rospy.loginfo("MISSIONE FASE 1 INIZIATA! Zeno in movimento.")
 
@@ -187,7 +189,7 @@ class Phase1Controller:
             # messaggio di stop 
             self.joystic_pub.publish(Rel_error_joystick(error_surge_speed=0.0, error_yaw=0.0))
 
-            t_end = rospy.Time.now()
+            t_end = self.current_timestamp
             mission_time = (t_end - self.t_start).to_sec()
 
             rospy.loginfo("==============================================")
@@ -313,7 +315,11 @@ class Phase1Controller:
         # Scrittura CSV
         try:
             if not self.csv_file.closed:
-                current_time = (rospy.Time.now() - self.t_start).to_sec() if self.t_start else 0.0
+                if self.t_start and self.current_timestamp:
+                    current_time = (self.current_timestamp - self.t_start).to_sec()
+                else:
+                    current_time = 0.0
+
                 self.csv_writer.writerow([
                     "{:.2f}  ".format(current_time),
                     "{:.6f}  ".format(self.current_lat),
