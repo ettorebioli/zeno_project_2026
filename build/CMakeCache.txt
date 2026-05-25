@@ -427,10 +427,10 @@ std_msgs_DIR:PATH=/opt/ros/melodic/share/std_msgs/cmake
 xmlrpcpp_DIR:PATH=/opt/ros/melodic/share/xmlrpcpp/cmake
 
 //Value Computed by CMake
-zeno_python_BINARY_DIR:STATIC=/home/student/catkin_ws/build/zeno_python
+zeno_mission_BINARY_DIR:STATIC=/home/student/catkin_ws/build/zeno_mission
 
 //Value Computed by CMake
-zeno_python_SOURCE_DIR:STATIC=/home/student/catkin_ws/src/zeno_python
+zeno_mission_SOURCE_DIR:STATIC=/home/student/catkin_ws/src/zeno_mission
 
 //Value Computed by CMake
 zeno_sim_pkg_BINARY_DIR:STATIC=/home/student/catkin_ws/build/zeno_sim_pkg

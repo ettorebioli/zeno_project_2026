@@ -133,7 +133,7 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("/home/student/catkin_ws/build/gtest/cmake_install.cmake")
   include("/home/student/catkin_ws/build/marta_msgs/cmake_install.cmake")
   include("/home/student/catkin_ws/build/joystick_command/cmake_install.cmake")
-  include("/home/student/catkin_ws/build/zeno_python/cmake_install.cmake")
+  include("/home/student/catkin_ws/build/zeno_mission/cmake_install.cmake")
   include("/home/student/catkin_ws/build/zeno_sim_pkg/cmake_install.cmake")
 
 endif()
