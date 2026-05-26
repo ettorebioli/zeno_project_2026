@@ -22,7 +22,7 @@ from itertools import permutations
 
 # --- PARAMETRI ---
 RESOLUTION = 0.50  
-EXTRA_SAFETY_MARGIN = 0.5 # Margine extra per la barca 0.71 m di zeno + 0.29 di sicurezza per fare cifra tonda di celle
+EXTRA_SAFETY_MARGIN = 0.5 # Margine extra di sicurezza
 
 class Node:
     def __init__(self, parent=None, position=None):
@@ -159,7 +159,6 @@ def solve_tsp(start_ned, targets_ned, grid, resolution, min_n, min_e):
     
     # 2. Inizializziamo la Matrice dei Costi
     cost_matrix = [[0.0] * num_points for _ in range(num_points)]
-    rospy.loginfo("Generazione Matrice dei Costi A* tra %d nodi...", num_points)
     
     # 3. Calcoliamo i percorsi A* per ogni coppia possibile
     for i in range(num_points):
@@ -281,7 +280,7 @@ def main():
             elif in_orig:
                 valid_targets.append(t)
                 usa_originale = True
-                rospy.loginfo("Il Target %d richiede l'estensione dell'area (fuori dal ristretto, dentro originale).", i+1)
+                
             else:
                 rospy.logerr("ATTENZIONE: Il Target %d è FUORI dall'area di gara! SCARTATO per sicurezza.", i+1)
 
@@ -301,7 +300,6 @@ def main():
         poly_ned = poly_restricted_ned if poly_restricted_ned else poly_original_ned
         rospy.logwarn("Geofencing disabilitato: Manca uno dei poligoni o non ci sono target validi.")
 # 4. Acquisizione Posizione Reale di Zeno dal Topic GPS
-    rospy.loginfo("In attesa della posizione attuale di Zeno su /nav_status...")
     try:
         # Aspetta un solo messaggio per avere lo scatto iniziale
         nav_msg = rospy.wait_for_message("/nav_status", NavStatus, timeout=10.0)
@@ -323,9 +321,7 @@ def main():
 
     full_path_ned = []
 # --- APPLICAZIONE TSP ---
-    rospy.loginfo("Calcolo dell'ordine ottimo dei target tramite TSP...")
-    rospy.loginfo("Avvio Ottimizzatore TSP-A* (Obstacle-Aware)...")
-    
+
     # ==========================================
     # START CRONOMETRO
     # ==========================================
@@ -339,16 +335,8 @@ def main():
     # STOP CRONOMETRO
     # ==========================================
 
-    rospy.loginfo("Ordine ottimo trovato! Distanza: %.2f metri", real_dist)
-    rospy.loginfo("Tempo di calcolo TSP: %.2f secondi", tempo_impiegato)
-    # Stampiamo l'ordine dei target per verifica nel terminale
-    for idx, tg in enumerate(ordered_targets):
-        rospy.loginfo(" Target %d originale -> Diventa la tappa #%d: [N: %.2f, E: %.2f]", targets_ned.index(tg)+1, idx+1, tg[0], tg[1])
-
-    
 # Cicliamo sui target ORDINATI dal modulo TSP
     for i, target_ned in enumerate(ordered_targets):
-        rospy.loginfo("Esecuzione A* verso la Tappa TSP #%d..." % (i+1))
         
         start_idx = (int((current_pos_ned[0]-min_n)/RESOLUTION), int((current_pos_ned[1]-min_e)/RESOLUTION))
         target_idx = (int((target_ned[0]-min_n)/RESOLUTION), int((target_ned[1]-min_e)/RESOLUTION))
@@ -373,17 +361,6 @@ def main():
         else:
             rospy.logerr("Impossibile raggiungere la Tappa TSP %d!" % (i+1))
 
-    # =========================================================
-    # DEBUG A VIDEO: STAMPA I WAYPOINT CON Z=1
-    # =========================================================
-    rospy.loginfo("--- RICERCA WAYPOINT TARGET (Z=1.0) NELLA ROTTA ---")
-    
-    for indice, punto in enumerate(full_path_ned):
-        # punto[0] è Nord (X), punto[1] è Est (Y), punto[2] è la Z
-        if punto[2] == 1.0:
-            rospy.loginfo("Trovato Target all'indice %d! Coordinate: [X: %.2f, Y: %.2f, Z: %.1f]", 
-                          indice, punto[0], punto[1], punto[2])
-    # =========================================================
 
     if full_path_ned:
         rospy.sleep(1.0) 
@@ -418,7 +395,7 @@ def main():
         mission_log = {
             "timestamp": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
             "area_utilizzata": "Originale" if usa_orig_sicuro else "Ristretta",
-            "target_ordinati": ordered_targets,        # <--- L'ORDINE OTTIMIZZATO (Post-TSP)
+            "target_ordinati": ordered_targets,        
             "distanza_stimata_m": real_dist,
             "tempo_calcolo_tsp_s": tempo_impiegato,
             "waypoint_totali": len(full_path_ned),
@@ -438,7 +415,7 @@ def main():
         # =========================================================
         rospy.sleep(1.0)
         rospy.loginfo("Planner in pausa. Tengo vivo il topic /waypoint_path...")
-        rospy.spin()  # <--- QUESTA RIGA EVITA CHE IL NODO MUOIA
+        rospy.spin()
         
 if __name__ == '__main__':
     try:
