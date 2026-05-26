@@ -78,13 +78,16 @@ def astar(grid, start, end):
             if node_position[0] >= len(grid) or node_position[0] < 0 or \
                node_position[1] >= len(grid[0]) or node_position[1] < 0:
                 continue
-            if grid[node_position[0]][node_position[1]] != 0:
+            if grid[node_position[0]][node_position[1]] == 1:
                 continue
             if node_position in closed_set:
                 continue
                 
             new_node = Node(current_node, node_position)
             step_cost = 1.414 if new_position[0] != 0 and new_position[1] != 0 else 1.0
+
+            # Leggiamo il costo di geofencing della cella di arrivo (sarà 0 se dentro, 50 se fuori)
+            geofence_cost = grid[node_position[0]][node_position[1]]
             
             turn_cost = 0.0
             if current_node.parent is not None:
@@ -93,7 +96,7 @@ def astar(grid, start, end):
                 if prev_dir != new_position:
                     turn_cost = TURN_PENALTY
 
-            new_node.g = current_node.g + step_cost + turn_cost
+            new_node.g = current_node.g + step_cost + turn_cost + geofence_cost
             new_node.h = math.sqrt((new_node.position[0] - end_node.position[0])**2 + (new_node.position[1] - end_node.position[1])**2)
             new_node.f = new_node.g + new_node.h
             
@@ -130,7 +133,7 @@ def create_occupancy_grid(obstacles_ned, poly_ned, all_points_ned):
                 n_real = r * RESOLUTION + min_n
                 e_real = c * RESOLUTION + min_e
                 if not poly_path.contains_point((n_real, e_real)):
-                    grid[r][c] = 1
+                    grid[r][c] = 10000
                     
     return grid.tolist(), min_n, min_e
 
