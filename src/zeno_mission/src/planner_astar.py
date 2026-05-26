@@ -8,6 +8,8 @@ import matplotlib.path as mpltPath
 import time
 import json
 from datetime import datetime
+import os
+import rospkg
 
 
 # Importiamo i messaggi standard e custom
@@ -400,6 +402,15 @@ def main():
         # SALVATAGGIO
         # =========================================================
 
+        # Recuperiamo dinamicamente il percorso del pacchetto ROS
+        rospack = rospkg.RosPack()
+        pkg_path = rospack.get_path('zeno_mission')
+        log_dir = os.path.join(pkg_path, 'logs')
+
+        # Se la cartella 'logs' non esiste sul PC del collega, la creiamo al volo
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+
         # Recupero in modo sicuro la variabile (evita errori se non ci sono target)
         usa_orig_sicuro = locals().get('usa_originale', False)
 
@@ -407,15 +418,16 @@ def main():
         mission_log = {
             "timestamp": datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
             "area_utilizzata": "Originale" if usa_orig_sicuro else "Ristretta",
-            "target_validi_iniziali": targets_ned,     # <--- L'ORDINE ORIGINALE (Pre-TSP)
             "target_ordinati": ordered_targets,        # <--- L'ORDINE OTTIMIZZATO (Post-TSP)
             "distanza_stimata_m": real_dist,
             "tempo_calcolo_tsp_s": tempo_impiegato,
             "waypoint_totali": len(full_path_ned),
             "path": full_path_ned
         }
-        # Salviamo su file
-        nome_file = "/media/sf_ros_condivisa/mission_log_{}.json".format(mission_log["timestamp"])
+        
+        # Generiamo il percorso corretto per il file JSON usando os.path.join
+        nome_file = os.path.join(log_dir, "mission_log_{}.json".format(mission_log["timestamp"]))
+        
         with open(nome_file, 'w') as f:
             json.dump(mission_log, f, indent=4)
             
