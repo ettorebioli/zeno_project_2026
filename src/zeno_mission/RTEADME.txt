@@ -1,4 +1,4 @@
-La missione è arganizzata in 3 fasi
+La missione è organizzata in 3 fasi
 
 -------------------------------------------- FASE 0 --------------------------------------------
 In questa fase si ricevono in un file di testo <<safezone.txt>> i vertici della regione

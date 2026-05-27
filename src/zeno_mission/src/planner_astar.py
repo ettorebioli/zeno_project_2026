@@ -201,7 +201,7 @@ def solve_tsp(start_ned, targets_ned, grid, resolution, min_n, min_e):
     # 5. Ricostruiamo la lista dei target ordinati con la sequenza vincente
     ordered_targets = [all_points[idx] for idx in best_order_indices]
     
-    rospy.loginfo("TSP Risolto! Distanza reale prevista: %.2f m", best_cost)
+   # rospy.loginfo("TSP Risolto! Distanza reale prevista: %.2f m", best_cost)
     return ordered_targets, best_cost
 
 def main():
@@ -293,10 +293,10 @@ def main():
         # Scegliamo quale maschera passare alla creazione della griglia
         if usa_originale:
             poly_ned = poly_original_ned
-            rospy.loginfo("Area di navigazione impostata su: ORIGINALE (Massima estensione).")
+            rospy.loginfo("A_Star: Polig. ORIGINALE ")
         else:
             poly_ned = poly_restricted_ned
-            rospy.loginfo("Area di navigazione impostata su: RISTRETTA (Tutti i target in comfort zone).")
+            rospy.loginfo("A_Star: Polig. ORIGINALE ")
 
     else:
         # Fallback se manca un poligono
@@ -308,7 +308,7 @@ def main():
         nav_msg = rospy.wait_for_message("/nav_status", NavStatus, timeout=10.0)
         current_n, current_e = ll2ne(origin, (nav_msg.position.latitude, nav_msg.position.longitude))
         current_pos_ned = [current_n, current_e]
-        rospy.loginfo("Posizione Zeno agganciata in diretta: Nord {:.2f}, Est {:.2f}".format(current_n, current_e))
+        #rospy.loginfo("Posizione Zeno agganciata in diretta: Nord {:.2f}, Est {:.2f}".format(current_n, current_e))
     except rospy.ROSException:
         rospy.logerr("Timeout! Nessun messaggio su /nav_status")
         # Se il simulatore lagga, impostiamo un valore fittizio per NON far crashare il TSP
@@ -377,7 +377,7 @@ def main():
             msg.waypoints.append(p)
             
         waypoint_pub.publish(msg)
-        rospy.loginfo("Missione Calcolata! {} waypoint pubblicati.".format(len(full_path_ned)))
+        rospy.loginfo("A_star: Pianifificazione avvenuta con SUCCESSO")
         # =========================================================
         # SALVATAGGIO
         # =========================================================
@@ -411,13 +411,13 @@ def main():
         with open(nome_file, 'w') as f:
             json.dump(mission_log, f, indent=4)
             
-        rospy.loginfo("Log di missione salvato in: %s", nome_file)
+        rospy.loginfo("A_star: Log di missione salvato in: %s", nome_file)
         
         # =========================================================
         # ORA METTIAMO IN PAUSA IL NODO
         # =========================================================
         rospy.sleep(1.0)
-        rospy.loginfo("Planner in pausa. Tengo vivo il topic /waypoint_path...")
+        #rospy.loginfo("Planner in pausa. Tengo vivo il topic /waypoint_path...")
         rospy.spin()
         
 if __name__ == '__main__':

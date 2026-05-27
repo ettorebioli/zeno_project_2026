@@ -87,7 +87,7 @@ class WPController:
             "Dist_to_Node_m", "CrossTrackErr_m", 
             "Surge_Cmd", "Yaw_Cmd_deg", "Event"
         ])
-        rospy.loginfo("Data Logger Fase 3 avviato. File: %s", self.csv_path)
+        rospy.loginfo("Path_ctr: Data Logger Fase 3 avviato. File: %s", self.csv_path)
 
         # Timer
         self.timer = rospy.Timer(rospy.Duration(0.1), self.control_loop)
@@ -104,7 +104,7 @@ class WPController:
         if self.path_active:
             return
 
-        rospy.loginfo("New waypoint path received")
+        rospy.loginfo("Path_ctr: New waypoint path received")
 
         self.waypoints = []
 
@@ -143,12 +143,12 @@ class WPController:
 
         if not self.path_received:
             if not self.path_waiting_logged:
-                rospy.loginfo("Waiting for waypoint path...")
+                rospy.loginfo("Path_ctr: Atessa waypoint path...")
                 self.path_waiting_logged = True # Blocco stampe successive
             return
 
         if None in (self.current_lat, self.current_lon, self.current_yaw, self.origin, self.current_stamp):
-            rospy.loginfo_throttle(5.0, "Waiting for data (GPS/Stamp)...")
+            rospy.loginfo_throttle(5.0, "Path_ctr: Attesa dati (GPS/Stamp)...")
             return
 
         if self.t_start is None and self.path_active:
@@ -394,7 +394,7 @@ class WPController:
         self.joystic_pub.publish(Rel_error_joystick(error_surge_speed=0.0, error_yaw=0.0))
         if not self.csv_file.closed:
             self.csv_file.close()
-            rospy.loginfo("Scatola Nera Fase 3 salvata con successo.")
+            rospy.loginfo("Path_ctr: Scatola Nera Fase 3 salvata con successo.")
 
 
 

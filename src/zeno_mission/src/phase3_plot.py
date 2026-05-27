@@ -139,7 +139,7 @@ def listener():
     fig, ax = plt.subplots(figsize=(10, 8))
     rate = rospy.Rate(10)
 
-    rospy.loginfo("Plotter in ascolto. In attesa del planner A*...")
+    #rospy.loginfo("Plotter in ascolto. In attesa del planner A*...")
 
     # ========================================================
     # AGGIUNTA 1: Flag per gestire il primissimo avvio
@@ -177,10 +177,10 @@ def listener():
         if len(target_ns) > 0:
             ax.scatter(target_es, target_ns, c='gold', edgecolors='black', s=300, marker='*', zorder=5, label='Targets')
 
-        # Disegna Waypoints
+         # Disegna Waypoints
         if len(wp_e_copy) > 0:
-            ax.scatter(wp_e_copy, wp_n_copy, c='limegreen', s=40, marker='o', zorder=4, label='Waypoints')
-            ax.plot(wp_e_copy, wp_n_copy, c='lightgreen', linestyle=':', linewidth=1)
+            ax.scatter(wp_e_copy, wp_n_copy, c='limegreen', s=10, marker='o', alpha=0.3, zorder=4, label='Waypoints')
+            ax.plot(wp_e_copy, wp_n_copy, c='lightgreen', linestyle=':', linewidth=1, alpha=0.5)
 
         # Disegna Traiettoria
         if len(x_copy) > 0:
@@ -214,7 +214,7 @@ def listener():
         plt.pause(0.05)
         rate.sleep()
 
-    rospy.loginfo("Chiusura Plotter. Salvataggio dati e immagine in corso...")
+    #rospy.loginfo("Chiusura Plotter. Salvataggio dati e immagine in corso...")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     
     # Troviamo la cartella 'logs' nel workspace in modo universale
@@ -234,7 +234,7 @@ def listener():
 
 
     # 1. Salva l'immagine del grafico finale in alta risoluzione
-    percorso_img = os.path.join(img_dir, "mappa_fase3_{}.png".format(timestamp))
+    percorso_img = os.path.join(img_dir, "mappa_fase3_{}.pdf".format(timestamp))
     fig.savefig(percorso_img, dpi=300, bbox_inches='tight')
     rospy.loginfo("Mappa salvata in: %s", percorso_img)
 
