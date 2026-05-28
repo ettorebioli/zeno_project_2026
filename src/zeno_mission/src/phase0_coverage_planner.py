@@ -83,64 +83,83 @@ def intersect_horizontal_line_convex_poly(y_level, polygon):
     else:
         return None
 
-
 def plan_coverage_path(restricted_poly, safety_offset=2.0):
     
-    # PARAMETRI DEL SENSORE 
-    water_column = 3.710
-    near_nadir = 3.550
-    sweet_area = 10.0   
-    
-    blind_zone_half = water_column + near_nadir 
-    
-    # Distanza dal bordo originale 
-    #dist_from_true_boundary = sweet_area + blind_zone_half
-    dist_from_true_boundary=10.0
-    
-    # Rientro visto che lavoriamo sul poligono ristretto
-    inward_shift = max(0.0, dist_from_true_boundary - safety_offset)
-    
-    rospy.loginfo("Distanza target dal bordo vero: {:.2f} m".format(dist_from_true_boundary))
-    rospy.loginfo("Inward shift sul poligono ristretto: {:.2f} m".format(inward_shift))
+    # Parmetri SSS
+    spacing = 10.0   # Distanza tra trasetti intermedi (m)
+    lb = 8.0        # Lower Bound: Distanza minima accettabile dal bordo originale (m)
+    ub = 15.0        # Upper Bound: Distanza massima accettabile dal bordo originale (m)
+  
 
-    # Troviamo l'angolo ottimale (lato più lungo) e ruotiamo tutto
+    # Trova l'angolo ottimale (lato più lungo) e ruotiamo tutto
     theta = get_longest_edge_angle(restricted_poly)
     poly_flat = rotate_polygon(restricted_poly, -theta)
     
-    # Troviamo i limiti verticali del poligono "piatto"
+    # Trova i limiti verticali del poligono originale "piatto"
     y_min = np.min(poly_flat[:, 0])
     y_max = np.max(poly_flat[:, 0])
     
-    # Posizione esatta del PRIMO e dell'ULTIMO transetto
+    # Altezza totale dell'area 
+    total_height = (y_max - y_min)+(2.0 * safety_offset)
+    
+    rospy.loginfo("Altezza totale del poligono piatto (bordo originale): {:.2f} m".format(total_height))
+
+    # Numero di massimo di transetti teorici distanziati spacing 
+    max_N_theor = int(math.floor(total_height / spacing))
+    
+    selected_N = 0 # numero effettivo di transetti intermedi 
+    selected_dist_ext = lb 
+    
+    # Scansioniamo a ritroso dal numero massimo di transetti possibili per trovare l'ottimo
+    for N in range(max_N_theor, -1, -1):
+        space_occupied_by_center = N * spacing
+        remaining_space = total_height - space_occupied_by_center
+        
+        # Lo spazio rimanente viene diviso equamente tra il bordo inferiore e superiore
+        dist_from_true_boundary = remaining_space / 2.0
+        
+        # Verifica se la distanza dell'esterno cade nel range consentito [lb, ub]
+        if lb <= dist_from_true_boundary <= ub:
+            selected_N = N
+            selected_dist_ext = dist_from_true_boundary
+            break
+    else:
+        # Cadiamo qui se il for finisce naturalmente -> non ci sono soluzioni al problema 
+
+        for N in range(max_N_theor, -1, -1):
+            space_occupied_by_center = N * spacing
+            remaining_space = total_height - space_occupied_by_center
+            dist_from_true_boundary = remaining_space / 2.0
+            if dist_from_true_boundary >= lb:
+                selected_N = N
+                selected_dist_ext = dist_from_true_boundary
+                rospy.logwarn("Impossibile rispettare l'Upper Bound di {:.2f}m. Scelta forzata.".format(ub))
+                break
+
+    # Calcoliamo lo shift effettivo sul poligono ristretto (che è già eroso di safety_offset)
+    inward_shift = max(0.0, selected_dist_ext - safety_offset)
+    
+    rospy.loginfo("Distanza ottimale transetti esterni dal bordo vero: {:.2f} m (Range: [{:.1f}, {:.1f}])".format(selected_dist_ext, lb, ub))
+    rospy.loginfo("Inward shift calcolato sul poligono ristretto: {:.2f} m".format(inward_shift))
+    rospy.loginfo("Numero di intervalli centrali da esattamente {:.1f}m: {}".format(spacing, selected_N))
+
+    # Posizionamento esatto del PRIMO e dell'ULTIMO transetto sul poligono ristretto
     y_start = y_min + inward_shift
     y_end = y_max - inward_shift
-    
-    # Spazio totale rimanente da dividere per i transetti intermedi
-    usable_height = y_end - y_start
-    
-    if usable_height <= 0:
-        rospy.logwarn("Attenzione: Area troppo stretta! si ha un solo transetto centrale")
-        # forziamo un solo passaggio al centro esatto
-        y_levels = [(y_min + y_max) / 2.0]
+
+    # Generazione dei livelli Y
+    y_levels = []
+    if selected_N == 0:
+        # Se l'area è talmente stretta da non contenere nemmeno un transetto intermedio a 10m,
+        # facciamo un solo passaggio al centro esatto del poligono originale
+        y_levels.append((y_min + y_max) / 2.0)
     else:
-
-        #Transetti intermedi 
-        # Il limite massimo di distanza tra una riga e l'altra è sweet_area
-        max_spacing = sweet_area 
-        
-        # Calcoliamo quanti intervalli servono (arrotondamento per eccessio (math.ceil) ) 
-        num_intervals = int(math.ceil(usable_height / max_spacing))
-        
-        # Calcoliamo la spaziatura reale identica per tutti i transetti intermedi
-        real_spacing = usable_height / num_intervals
-        
-        rospy.loginfo("Transetti totali: {}. Spaziatura intermedia: {:.2f} m (Limite Max: {:.2f} m)".format(
-            num_intervals + 1, real_spacing, max_spacing))
-
-        # Generazione della lista dei livelli Y (dal primo all'ultimo)
-        y_levels = [y_start + i * real_spacing for i in range(num_intervals + 1)]
-        
-    # INTERSEZIONE E CREAZIONE ZIG-ZAG 
+        # Generiamo il primo livello, tutti quelli intermedi distanziati rigorosamente di 'spacing', e l'ultimo
+        for i in range(selected_N + 1):
+            y_level = y_start + i * spacing
+            y_levels.append(y_level)
+            
+    # INTERSEZIONE E CREAZIONE ZIG-ZAG (Invariata)
     flat_waypoints = []
     left_to_right = True 
     
@@ -158,10 +177,13 @@ def plan_coverage_path(restricted_poly, safety_offset=2.0):
                 
             left_to_right = not left_to_right
             
-    # Contro-rotazione per tornare nel mondo NED
+    # Contro-rotazione per tornare nel mondo NED (Invariata)
     final_waypoints = rotate_polygon(np.array(flat_waypoints), theta)
     
     return final_waypoints
+
+
+
 def save_waypoints_to_yaml(waypoints):
   
     try:
