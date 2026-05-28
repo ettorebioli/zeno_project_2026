@@ -249,7 +249,6 @@ def calculate_virtual_targets(grid, cov_grid, min_n, min_e, resolution, swath_wi
                                 queue.append((nr, nc))
                                 
                 area_m2 = len(blob) * (resolution ** 2)
-                rospy.loginfo("Area blob: %.2f m", area_m2)
                 if area_m2 >= min_area:
                     blob_set = set(blob)
                     min_r, max_r = min([pt[0] for pt in blob]), max([pt[0] for pt in blob])

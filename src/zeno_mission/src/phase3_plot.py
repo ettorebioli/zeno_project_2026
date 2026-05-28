@@ -11,7 +11,9 @@ import threading
 import matplotlib.path as mpltPath
 import json
 from datetime import datetime
-
+import os
+import rospkg
+import csv
 # --- Variabili Globali ---
 xs = []
 ys = []
@@ -137,7 +139,7 @@ def listener():
     fig, ax = plt.subplots(figsize=(10, 8))
     rate = rospy.Rate(10)
 
-    rospy.loginfo("Plotter in ascolto. In attesa del planner A*...")
+    #rospy.loginfo("Plotter in ascolto. In attesa del planner A*...")
 
     # ========================================================
     # AGGIUNTA 1: Flag per gestire il primissimo avvio
@@ -175,10 +177,10 @@ def listener():
         if len(target_ns) > 0:
             ax.scatter(target_es, target_ns, c='gold', edgecolors='black', s=300, marker='*', zorder=5, label='Targets')
 
-        # Disegna Waypoints
+         # Disegna Waypoints
         if len(wp_e_copy) > 0:
-            ax.scatter(wp_e_copy, wp_n_copy, c='limegreen', s=40, marker='o', zorder=4, label='Waypoints')
-            ax.plot(wp_e_copy, wp_n_copy, c='lightgreen', linestyle=':', linewidth=1)
+            ax.scatter(wp_e_copy, wp_n_copy, c='limegreen', s=10, marker='o', alpha=0.3, zorder=4, label='Waypoints')
+            ax.plot(wp_e_copy, wp_n_copy, c='lightgreen', linestyle=':', linewidth=1, alpha=0.5)
 
         # Disegna Traiettoria
         if len(x_copy) > 0:
@@ -212,27 +214,47 @@ def listener():
         plt.pause(0.05)
         rate.sleep()
 
-    rospy.loginfo("Chiusura Plotter. Salvataggio dati e immagine in corso...")
+    #rospy.loginfo("Chiusura Plotter. Salvataggio dati e immagine in corso...")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     
+    # Troviamo la cartella 'logs' nel workspace in modo universale
+    rospack = rospkg.RosPack()
+    pkg_path = rospack.get_path('zeno_mission')
+    log_dir = os.path.join(pkg_path, 'logs')
+
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    
+    # Troviamo la cartella 'logs' nel workspace in modo universale
+
+    img_dir = os.path.join(pkg_path, 'img')
+
+    if not os.path.exists(img_dir):
+        os.makedirs(img_dir)
+
+
     # 1. Salva l'immagine del grafico finale in alta risoluzione
-    percorso_img = "/media/sf_ros_condivisa/mappa_finale_{}.png".format(timestamp)
+    percorso_img = os.path.join(img_dir, "mappa_fase3_{}.pdf".format(timestamp))
     fig.savefig(percorso_img, dpi=300, bbox_inches='tight')
     rospy.loginfo("Mappa salvata in: %s", percorso_img)
 
-    # 2. Salva la traiettoria reale (le liste xs e ys)
-    with lock:
-        dati_reali = {
-            "timestamp": timestamp,
-            "x_reali_ned": xs,
-            "y_reali_ned": ys
-        }
+    # 2. Salva la traiettoria reale (le liste xs e ys) in CSV
+    
+    # Costruiamo il nome del file CSV
+    percorso_csv = os.path.join(log_dir, "traiettoria_reale_fase3_{}.csv".format(timestamp))
+    
+    # Scriviamo i dati riga per riga
+    with open(percorso_csv, 'w') as f:
+        writer = csv.writer(f)
+        # Intestazione delle colonne
+        writer.writerow(['Nord_x', 'Est_y']) 
         
-    percorso_json = "/media/sf_ros_condivisa/traiettoria_reale_{}.json".format(timestamp)
-    with open(percorso_json, 'w') as f:
-        json.dump(dati_reali, f, indent=4)
-        
-    rospy.loginfo("Traiettoria reale salvata in: %s", percorso_json)
+        with lock:
+            # zip accoppia ogni X con la sua Y e le scrive assieme
+            for x, y in zip(xs, ys):
+                writer.writerow([x, y])
+                
+    rospy.loginfo("Traiettoria reale salvata in CSV: %s", percorso_csv)
 
 if __name__ == "__main__":
     try:
