@@ -60,9 +60,6 @@ class WPController:
         self.max_heading_deg = 45.0
         self.distance_gain = 2.0
 
-	# Per comunicazione con SSS
-	self.sss_state = "OFF" # Stato iniziale
-
 
         # ROS I/O
         self.joystic_pub = rospy.Publisher( "/relative_error",Rel_error_joystick, queue_size=1 )
@@ -72,7 +69,6 @@ class WPController:
         rospy.Subscriber( "/waypoint_path", WaypointPath, self.path_callback)
 
         self.telemetry_pub = rospy.Publisher("/phase3/telemetry", String, queue_size=1)
-	self.sss_pub = rospy.Publisher("/phase3/SSS", String, queue_size=1)
         
         rospack = rospkg.RosPack()
         pkg_path = rospack.get_path('zeno_mission') 
@@ -250,27 +246,12 @@ class WPController:
 
         for i in range(look_ahead_range):
             wp = self.waypoints[self.current_wp_idx + i]
-            # wp e' una riga di NumPy: [North, East, z_flag]
-            if len(wp) > 2 and wp[2] in [1.0, 2.0, 3.0]: 
-                target_in_sight = True
-                rospy.loginfo("Trovato bersaglio speciale")
-                # Calcoliamo la distanza fisica da Zeno al bersaglio speciale
             if len(wp) > 2 and wp[2] == 1.0: 
                 target_in_sight = True
 
                 dist_to_special_target = math.sqrt((wp[0] - current_n)**2 + (wp[1] - current_e)**2)
-                rospy.loginfo_throttle(2.0, "Bersaglio rilevato in zona! Distanza attuale: %.2fm", dist_to_special_target)
+                #rospy.loginfo_throttle(2.0, "Bersaglio rilevato in zona! Distanza attuale: %.2fm", dist_to_special_target)
                 break
-	   
-	wp_curva = self.waypoints[self.current_wp_idx] 
-	if len(wp_curva) > 2 and wp_curva[2] in [-1.0, 3.0, 4.0]:
-		self.sss_state = "OFF"
-		rospy.loginfo("debug: curva indice %d", self.current_wp_idx)
-	else:
-		self.sss_state = "ON"
-
-	# Pubblicazione su topic  (pubblichiamo il comando in continuo a 10Hz )
-        self.sss_pub.publish(String(data=self.sss_state))
 
        
         L_standard = 1.0 + 1.0 * (1.0 - min(abs(error_track) / self.max_track_error, 1.0))
@@ -325,10 +306,7 @@ class WPController:
 
         # Gestione fine path 
         dist_to_current_end = math.sqrt((wp_end_n - current_n)**2 + (wp_end_e - current_e)**2)
-        # Override della soglia: se il wp da superare è un target (z=1), esigi altissima precisione!
-        if len(wp_end) > 2 and wp_end[2] == 1.0:
-            current_position_th = 0.5 # Passaggio quasi obbligato
-            #rospy.loginfo("PASSAGGIO OBLLIGATO A 0.5")
+
         is_target_node = (len(wp_end) > 2 and wp_end[2] == 1.0)
 
         if is_target_node:
