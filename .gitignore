@@ -1,0 +1,8 @@
+build/
+devel/
+
+src/sss_package/results/
+src/sss_package/results_phase3/
+
+*.pyc
+__pycache__/

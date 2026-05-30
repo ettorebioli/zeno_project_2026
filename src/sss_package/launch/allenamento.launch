@@ -1,5 +1,5 @@
-/home/student/catkin_ws/allenamento/allenamento_7/allenamento_7.bag<launch>
-  <arg name="bag" default="/home/student/Downloads/allenamento_7.bag" />
+<launch>
+  <arg name="bag" default="/home/student/Downloads/allenamento_6.bag" />
   <arg name="rate" default="1.0" />
   <arg name="loop_arg" default="" />
 
@@ -16,17 +16,16 @@
   <node pkg="sss_package"
         type="geolocalization_node.py"
         name="geolocalization_node"
-        output="screen">
-    <param name="sonar_range_m" value="25.0" />
-    <param name="sensor_x_offset_m" value="0.063" />
-    <param name="sensor_y_offset_m" value="0.354" />
-    <param name="sensor_z_offset_m" value="0.096" />
-    <param name="geodetic_functions_path" value="/home/student/Downloads" />
-  </node>
+        output="screen" />
+
+  <node pkg="sss_package"
+        type="realtime_visualizer_node.py"
+        name="realtime_visualizer_node"
+        output="screen" />
 
   <node pkg="rosbag"
         type="play"
-        name="allenamento_7_bag"
+        name="allenamento_6_bag"
         args="--delay=2 --rate=$(arg rate) $(arg loop_arg) $(arg bag)"
         output="screen" />
 </launch>
