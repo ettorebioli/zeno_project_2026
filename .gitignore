@@ -6,3 +6,5 @@ src/sss_package/results_phase3/
 
 *.pyc
 __pycache__/
+
+AGENTS.md
