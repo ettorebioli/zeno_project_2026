@@ -9,6 +9,7 @@ import cv2          # OpenCV
 import numpy as np
 import os
 import rospkg
+import math
 from marta_msgs.msg import Altitude
 from marta_msgs.msg import NavStatus
 from sss_package.msg import ImageMetadata
@@ -79,8 +80,16 @@ class ObjectClassificationNode:
 
 
         # definire parametri detection e classification
-        self.meters_per_pixel_x            = float(rospy.get_param('~meters_per_pixel_x', 0.025))			# risoluzione across-track
-        self.meters_per_pixel_y            = float(rospy.get_param('~meters_per_pixel_y', 0.125))			# risoluzioen along-track
+        self.sonar_range_m                 = float(rospy.get_param('~sonar_range_m', 25.0))
+        self.sonar_bins_per_side           = int(rospy.get_param('~sonar_bins_per_side', 1000))
+        self.sss_frequency_hz              = float(rospy.get_param('~sss_frequency_hz', 5.0))
+        self.alongtrack_beam_angle_deg     = float(rospy.get_param('~alongtrack_beam_angle_deg', 0.3))
+        self.alongtrack_beam_angle_rad     = math.radians(self.alongtrack_beam_angle_deg)
+        self.meters_per_pixel_x            = self.sonar_range_m / float(self.sonar_bins_per_side)			# across-track: passo dei bin in slant range
+        self.meters_per_pixel_y            = float(rospy.get_param('~meters_per_pixel_y', 0.125))			# along-track: aggiornato da nav_status a ogni immagine
+        self.auv_velocity_mps              = 0.0
+        self.alongtrack_sampling_m         = 0.0
+        self.alongtrack_beam_footprint_m   = 0.0
         self.min_object_area_px            = int(rospy.get_param('~min_object_area_px', 40))				# 40 << minima area dell oggetto stimata
         self.min_shadow_area_px            = int(rospy.get_param('~min_shadow_area_px', 20))				# 20 << minima area dell ombra stimata
         self.max_shadow_alongtrack_gap_m   = float(rospy.get_param('~max_shadow_alongtrack_gap_m', 2.5))
@@ -170,6 +179,20 @@ class ObjectClassificationNode:
         image = self.ros_image_to_cv2(msg.image)
         if image is None:
             return
+
+        # Risoluzione across-track semplificata: 25 m / 1000 bin = 0.025 m/px.
+        self.meters_per_pixel_x = self.sonar_range_m / float(self.sonar_bins_per_side)
+
+        # Risoluzione along-track semplificata:
+        # - la velocita arriva dal NavStatus della riga centrale dell'immagine
+        # - il passo tra ping e velocita / frequenza SSS
+        # - il footprint del fascio e range massimo * ampiezza angolare in radianti
+        # - uso il peggiore dei due contributi come risoluzione effettiva
+        nav_status = msg.nav_statuses[int(image.shape[0] / 2)]
+        self.auv_velocity_mps = math.sqrt((nav_status.ned_speed.x * nav_status.ned_speed.x) + (nav_status.ned_speed.y * nav_status.ned_speed.y))
+        self.alongtrack_sampling_m = self.auv_velocity_mps / self.sss_frequency_hz
+        self.alongtrack_beam_footprint_m = self.sonar_range_m * self.alongtrack_beam_angle_rad
+        self.meters_per_pixel_y = max(self.alongtrack_sampling_m, self.alongtrack_beam_footprint_m)
 
         # 2. filtering pipeline	
         #image = self.apply_log_filter(image)
@@ -790,20 +813,7 @@ class ObjectClassificationNode:
         box = cv2.boxPoints(pixel_rect)
         return [[int(round(point[0])), int(round(point[1]))] for point in box]
 
-    # ========================================================
-    # GEOMETRIA E LOCALIZZAZIONE
-    # ========================================================
-    def image_to_body_frame(self, bbox_center):
-        # conversione coordinate immagine -> body frame AUV
-        return
 
-    def body_to_ned(self, body_coords, nav_status):
-        # conversione body frame -> NED
-        return
-
-    def geolocalize_object(self, bbox_center, nav_status):
-        # ottenere latitudine e longitudine oggetto
-        return
 
     # ========================================================
     # GESTIONE OGGETTI RICONOSCIUTI IN PIU IMMAGINI
@@ -923,6 +933,13 @@ class ObjectClassificationNode:
                 text_file.write("cfar_pfa: {:.6f}\n".format(self.cfar_pfa))
                 text_file.write("bright_percentile: {:.3f}\n".format(self.bright_percentile))
                 text_file.write("dark_percentile: {:.3f}\n".format(self.dark_percentile))
+                text_file.write("sonar_range_m: {:.3f}\n".format(self.sonar_range_m))
+                text_file.write("sonar_bins_per_side: {}\n".format(self.sonar_bins_per_side))
+                text_file.write("sss_frequency_hz: {:.3f}\n".format(self.sss_frequency_hz))
+                text_file.write("alongtrack_beam_angle_deg: {:.3f}\n".format(self.alongtrack_beam_angle_deg))
+                text_file.write("auv_velocity_mps: {:.3f}\n".format(self.auv_velocity_mps))
+                text_file.write("alongtrack_sampling_m: {:.6f}\n".format(self.alongtrack_sampling_m))
+                text_file.write("alongtrack_beam_footprint_m: {:.6f}\n".format(self.alongtrack_beam_footprint_m))
                 text_file.write("meters_per_pixel_x: {:.6f}\n".format(self.meters_per_pixel_x))
                 text_file.write("meters_per_pixel_y: {:.6f}\n".format(self.meters_per_pixel_y))
                 text_file.write("nadir_column: center_of_image\n")
@@ -984,4 +1001,3 @@ if __name__ == "__main__":
     node = ObjectClassificationNode()
     # spin ROS
     rospy.spin()
-
