@@ -19,6 +19,8 @@ class RealtimeVisualizerNode:
 
     def __init__(self):
 
+        print("[SSS] realtime_visualizer_node.py initialization\n")
+
         # inizializzare subscriber/publisher
         rospy.Subscriber('/waterfall_realtime_topic', ImageMetadata, self.realtime_waterfall_callback, queue_size=1)
         rospy.Subscriber('/classified_objects_topic', ImageMetadata, self.classified_objects_callback, queue_size=20)

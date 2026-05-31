@@ -23,7 +23,7 @@ class ObjectClassificationNode:
 
     def __init__(self):
 
-	print("object_classification_node.py initialization\n")
+	print("[SSS] object_classification_node.py is active\n")
 
         # inizializzare subscriber/publisher
         rospy.Subscriber('/waterfall_image_topic', ImageMetadata, self.list_callback)
@@ -88,34 +88,29 @@ class ObjectClassificationNode:
         self.shadow_height_scale           = float(rospy.get_param('~shadow_height_scale', 1.0))
         self.min_classification_confidence = float(rospy.get_param('~min_classification_confidence', 0.35))
 
-        # 1. Ottieni il percorso base del pacchetto
+
+        # creazione cartelle per risultati 
         rospack = rospkg.RosPack()
         pkg_path = rospack.get_path('sss_package') 
 
-        # 2. Definisci la cartella 'results' principale (sovrascrivibile da parametro)
         default_results_dir = os.path.join(pkg_path, 'results')
         results_dir = rospy.get_param('~results_folder', default_results_dir)
 
-        # 3. Definisci i percorsi di tutte le sottocartelle
         self.filtered_image_folder = os.path.join(results_dir, "2_filtered_images")
         self.saliency_image_folder = os.path.join(results_dir, "3_saliency_images")
         self.saliency_binary_image_folder = os.path.join(results_dir, "4_saliency_binary_images")
 
-        # Cartelle Binary maps (e relative sottocartelle)
         self.binary_maps_image_folder = os.path.join(results_dir, "5_binary_maps_images")
         self.bright_map_folder = os.path.join(self.binary_maps_image_folder, "bright_maps")
         self.dark_map_folder = os.path.join(self.binary_maps_image_folder, "dark_maps")
 
-        # Cartelle Binary AND salient maps (e relative sottocartelle)
         self.binary_and_salient_maps_image_folder = os.path.join(results_dir, "6_binary_and_salient_maps_images")
         self.bright_and_salient_map_folder = os.path.join(self.binary_and_salient_maps_image_folder, "bright_maps")
         self.dark_and_salient_map_folder = os.path.join(self.binary_and_salient_maps_image_folder, "dark_maps")
 
-        # Cartelle Classification
         self.classification_image_folder = os.path.join(results_dir, "7_classification_images")
         self.classification_text_folder = os.path.join(results_dir, "8_classification_texts")
 
-        # 4. Crea tutte le cartelle in un colpo solo tramite un ciclo
         folders_to_create = [
             self.filtered_image_folder,
             self.saliency_image_folder,
@@ -209,12 +204,12 @@ class ObjectClassificationNode:
         self.save_classification_text(classifications, image_index)
         classified_msg = self.build_classified_objects_message(msg, classifications)
         self.pub_classified_objects.publish(classified_msg)
-        rospy.loginfo("classified_objects_topic: pubblicata immagine {:03d} con {} oggetti classificati".format(
+        rospy.loginfo("[SSS] classified_objects_topic: pubblicata immagine {:03d} con {} oggetti classificati".format(
             image_index,
             len(classifications)
         ))
         if len(classifications) == 0:
-            rospy.logwarn("object_classification_node: nessun oggetto classificato nell'immagine {:03d}".format(image_index))
+            rospy.logwarn("[SSS] object_classification_node: nessun oggetto classificato nell'immagine {:03d}".format(image_index))
         self.image_index += 1
 
         return classifications
@@ -846,7 +841,7 @@ class ObjectClassificationNode:
         filename = os.path.join(folder, "{}_{:03d}.png".format(prefix, image_index))
         saved = cv2.imwrite(filename, image)
         if not saved:
-            rospy.logwarn("Impossibile salvare immagine: {}".format(filename))
+            rospy.logwarn("[SSS] Impossibile salvare immagine: {}".format(filename))
         return filename
 
     def save_filtered_image(self, image, image_index):
@@ -974,7 +969,7 @@ class ObjectClassificationNode:
                     text_file.write("shadow_area_m2: {:.3f}\n".format(shadow['area_m2']))
                     text_file.write("shadow_angle_deg: {:.3f}\n".format(shadow['angle_deg']))
         except IOError as exc:
-            rospy.logwarn("Impossibile salvare report classificazione: {} ({})".format(filename, exc))
+            rospy.logwarn("[SSS] Impossibile salvare report classificazione: {} ({})".format(filename, exc))
 
         return filename
 
@@ -982,13 +977,11 @@ class ObjectClassificationNode:
 # MAIN
 # ============================================================
 if __name__ == "__main__":
-    # try:
-        # inizializzare nodo ROS
-        rospy.init_node('object_classification_node', anonymous=True)
-        # istanziare ObjectClassificationNode
-        node = ObjectClassificationNode()
-        # spin ROS
-        rospy.spin()
-	print("All done :)\n")
-    # except rospy.ROSInterruptException:
-        # pass
+
+    # inizializzare nodo ROS
+    rospy.init_node('object_classification_node', anonymous=True)
+    # istanziare ObjectClassificationNode
+    node = ObjectClassificationNode()
+    # spin ROS
+    rospy.spin()
+

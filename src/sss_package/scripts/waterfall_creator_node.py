@@ -31,13 +31,10 @@ class WaterfallCreatorNode:
 
     def __init__(self):
 
-	print("waterfall_creator_node.py initialization\n")
+	print("[SSS] waterfall_creator_node.py is active\n")
 
-        # inizializzare subscriber/publisher
-        rospy.Subscriber('/drivers/sss_sim', SideScanSonar, self.image_callback)
-        rospy.Subscriber('/drivers/altitude_sim', Altitude, self.altitude_callback)
-        rospy.Subscriber('/nav_status', NavStatus, self.navstatus_callback)
-        self.pub_img = rospy.Publisher('waterfall_image_topic', ImageMetadata, queue_size=200)
+        # inizializzare publisher
+        self.pub_img                = rospy.Publisher('waterfall_image_topic', ImageMetadata, queue_size=200)
         self.pub_realtime_waterfall = rospy.Publisher('waterfall_realtime_topic', ImageMetadata, queue_size=5)
 
         # inizializzare CvBridge
@@ -106,6 +103,11 @@ class WaterfallCreatorNode:
         # 5. Hook di spegnimento del nodo
         rospy.on_shutdown(self.save_echo_intensity_plots)
         rospy.on_shutdown(self.save_altitude_plot)
+
+        # inizializzare subscriber
+        rospy.Subscriber('/drivers/sss_sim', SideScanSonar, self.image_callback)
+        rospy.Subscriber('/drivers/altitude_sim', Altitude, self.altitude_callback)
+        rospy.Subscriber('/nav_status', NavStatus, self.navstatus_callback)
 
         pass
 
@@ -208,7 +210,6 @@ class WaterfallCreatorNode:
     # LETTURA DATI
     # ========================================================
     def read_intensity_vectors(self, msg):
-	# print("Reading intensity vectors\n")
         # beam destro e sinistro
         if isinstance(msg.left_beam.data, str):
             left = np.frombuffer(msg.left_beam.data, dtype=np.uint8).astype(np.float32)
@@ -226,7 +227,6 @@ class WaterfallCreatorNode:
     # PREPROCESSING DATI
     # ========================================================
     def apply_tvg(self, beam, strength=0.5):  		# beam destro o sinistro
-	# print("Applying TVG\n")
         # applicare Time Variable Gain:
         beam = np.asarray(beam, dtype=np.float32)
         if beam.size == 0:
@@ -238,7 +238,6 @@ class WaterfallCreatorNode:
         return np.clip(corrected_beam, 0, 255).astype(np.float32)
 
     def apply_tvg_quadratic(self, beam, strength=0.5):  # beam destro o sinistro
-	# print("Applying quadratic TVG\n")
         # applicare Time Variable Gain quadratico:
         # gain = 1 + strength * (range / range_max)^2
         beam = np.asarray(beam, dtype=np.float32)
@@ -251,7 +250,6 @@ class WaterfallCreatorNode:
         return np.clip(corrected_beam, 0, 255).astype(np.float32)
 
     def apply_tvg_logarithmic(self, beam, spreading_gain_db=20.0, absorption_db_per_sample=0.0):   # beam destro o sinistro
-        # print("Applying logarithmic TVG\n")
         # applicare Time Variable Gain logaritmico
         # gain_dB = spreading_gain_db * log10(range) + 2 * alpha * range
         beam = np.asarray(beam, dtype=np.float32)
@@ -269,7 +267,6 @@ class WaterfallCreatorNode:
         return np.clip(corrected_beam, 0, 255).astype(np.float32)
 
     def apply_slant_range_correction(self, beam, sonar_range, sonar_altitude=None):       # beam destro o sinistro
-	# print("Applying slant range correction\n")
         # correggere distorsione geometrica da slant range a ground range:
         # ground_range = sqrt(slant_range^2 - altitude^2)
         beam = np.asarray(beam, dtype=np.float32)
@@ -304,19 +301,16 @@ class WaterfallCreatorNode:
         return corrected_beam.astype(np.float32)
 
     def remove_blind_zone(self, beam):                  # beam destro o sinistro
-	# print("Removing blind zone\n")
         # rimuovere zona cieca sonar
         return beam
 
     def merge_beams(self, right, left):
-	# print("Merging beams\n")
         # unire beam destro e sinistro in singolo profilo (ping)
         left = left[::-1]
         ping = np.concatenate([left, right])
         return ping
 
     def check_nav_and_discard_ping(self, latest_nav, ping):
-	# print("Checking if Zeno is turning\n")
         # verificare se AUV sta curvando e, in caso affermativo, scartare ping
         if latest_nav is None:
             return ping
@@ -328,7 +322,6 @@ class WaterfallCreatorNode:
     # COSTRUZIONE WATERFALL
     # ========================================================
     def stack_pings(self, ping, ping_buffer):
-	# print("Stacking pings\n")
 	# aggiungi il nuovo ping in cima alla lista per simulare l'avanzamento
 	ping_buffer.insert(0, ping)
 	# mantenere solo gli ultimi 500 ping per effetto waterfall
@@ -359,7 +352,6 @@ class WaterfallCreatorNode:
         return None
 
     def build_waterfall(self, window):
-	# print("Building the waterfall\n")
         if window is None or window.size == 0:
             return None
 
@@ -413,7 +405,6 @@ class WaterfallCreatorNode:
     # COSTRUZIONE IMMAGINI
     # ========================================================
     def build_image(self, ping_buffer):
-	# print("Building an image\n")
         # creare immagini di 150 ping
         if len(ping_buffer) >= self.ping_per_image:
             image_step = self.ping_per_image - self.ping_overlap
@@ -436,10 +427,9 @@ class WaterfallCreatorNode:
     def publish_image(self, image, image_metadata):
         if image is None or image_metadata is None:
             if self.ping_index >= self.ping_per_image:
-                rospy.logwarn_throttle(10.0, "waterfall_creator_node: waterfall_image_topic non ancora pubblicato; immagine o metadata mancanti")
+                rospy.logwarn_throttle(10.0, "[SSS] waterfall_creator_node: waterfall_image_topic non ancora pubblicato; immagine o metadata mancanti")
             return
 
-	# print("Publishing an image\n")
         # convertire in formato ROS Image
         ros_img = self.bridge.cv2_to_imgmsg(image, encoding='mono8')
         ros_img.header.seq = self.image_index
@@ -458,7 +448,7 @@ class WaterfallCreatorNode:
 
         # pubblicare immagine e metadata sul topic waterfall_image_topic
         self.pub_img.publish(metadata_msg)
-        rospy.loginfo("waterfall_image_topic: pubblicata immagine {:03d} con {} ping".format(
+        rospy.loginfo("[SSS] waterfall_image_topic: pubblicata immagine {:03d} con {} ping".format(
             self.image_index,
             len(metadata_msg.ping_indices)
         ))
@@ -536,19 +526,18 @@ class WaterfallCreatorNode:
 
     def save_echo_intensity_plots(self):
         if len(self.raw_echo_buffer) == 0:
-            print("No echo intensity data collected, plots not generated")
+            print("[SSS] No echo intensity data collected, plots not generated")
             return
 
         raw_3d_filename = os.path.join(self.echo_plot_folder, "echo_intensity_raw_3d_{:03d}.png".format(self.echo_plot_index))
         processed_3d_filename = os.path.join(self.echo_plot_folder, "echo_intensity_processed_3d_{:03d}.png".format(self.echo_plot_index))
         comparison_2d_filename = os.path.join(self.echo_plot_folder, "echo_intensity_comparison_2d_{:03d}.png".format(self.echo_plot_index))
 
-        print("Generating final echo intensity plots")
+        print("[SSS] Saving final echo intensity plots")
         self.plot_echo_intensity_3d(self.raw_echo_buffer, "Raw 3D Side Scan Sonar Intensity", raw_3d_filename)
         self.plot_echo_intensity_3d(self.processed_echo_buffer, "After TVG + Slant Correction 3D Side Scan Sonar Intensity", processed_3d_filename)
         self.plot_echo_intensity_2d(self.raw_echo_buffer, self.processed_echo_buffer, comparison_2d_filename)
 
-        print("Echo intensity plots saved in {}".format(self.echo_plot_folder))
         self.echo_plot_index += 1
 
 
@@ -568,7 +557,7 @@ class WaterfallCreatorNode:
 
     def save_altitude_plot(self):
         if len(self.altitude_samples) == 0:
-            print("No altitude data collected, plot not generated")
+            print("[SSS] No altitude data collected, plot not generated")
             return
 
         fig, ax = plt.subplots(figsize=(14, 6))
@@ -582,10 +571,11 @@ class WaterfallCreatorNode:
         ax.grid(True, alpha=0.3)
         ax.legend()
 
+        print("[SSS] Saving final altitude plots")
         filename = os.path.join(self.altitude_plot_folder, "altitude_over_time.png")
         fig.savefig(filename, dpi=120, bbox_inches='tight')
         plt.close(fig)
-        print("Altitude plot saved: {}".format(filename))
+
         return filename
 
     # ========================================================
@@ -604,13 +594,11 @@ class WaterfallCreatorNode:
 # MAIN
 # ============================================================
 if __name__ == "__main__":
-    # try:
-        # inizializzare nodo ROS
-        rospy.init_node('waterfall_creator_node', anonymous=True)
-        # istanziare WaterfallCreatorNode
-        node = WaterfallCreatorNode()
-        # spin ROS
-        rospy.spin()
-	print("All done :)\n")
-    # except rospy.ROSInterruptException:
-        # pass
+
+    # inizializzare nodo ROS
+    rospy.init_node('waterfall_creator_node', anonymous=True)
+    # istanziare WaterfallCreatorNode
+    node = WaterfallCreatorNode()
+    # spin ROS
+    rospy.spin()
+
