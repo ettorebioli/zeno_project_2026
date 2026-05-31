@@ -3,18 +3,23 @@
   <arg name="loop_arg" default="" />
 
   <node pkg="sss_package"
-        type="image_creator.py"
-        name="image_creator"
+        type="waterfall_creator_node.py"
+        name="waterfall_creator_node"
         output="screen" />
 
   <node pkg="sss_package"
-        type="list_creator.py"
-        name="list_creator"
+        type="object_classification_node.py"
+        name="object_classification_node"
         output="screen" />
 
   <node pkg="sss_package"
-        type="geolocalization.py"
-        name="geolocalization"
+        type="geolocalization_node.py"
+        name="geolocalization_node"
+        output="screen" />
+
+  <node pkg="sss_package"
+        type="realtime_visualizer_node.py"
+        name="realtime_visualizer_node"
         output="screen" />
 
 </launch>
