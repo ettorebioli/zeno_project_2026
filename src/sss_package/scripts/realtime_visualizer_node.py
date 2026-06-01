@@ -22,8 +22,8 @@ class RealtimeVisualizerNode:
         print("[SSS] realtime_visualizer_node.py initialization\n")
 
         # inizializzare subscriber/publisher
-        rospy.Subscriber('/waterfall_realtime_topic', ImageMetadata, self.realtime_waterfall_callback, queue_size=1)
-        rospy.Subscriber('/classified_objects_topic', ImageMetadata, self.classified_objects_callback, queue_size=20)
+        rospy.Subscriber('/waterfall_realtime_topic', ImageMetadata, self.realtime_waterfall_callback, queue_size=100)
+        rospy.Subscriber('/classified_objects_topic', ImageMetadata, self.classified_objects_callback, queue_size=100)
         rospy.on_shutdown(cv2.destroyAllWindows)
 
         # inizializzare CvBridge

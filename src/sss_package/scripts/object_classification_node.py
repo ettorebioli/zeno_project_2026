@@ -244,9 +244,7 @@ class ObjectClassificationNode:
         detected_msg.ping_indices = source_msg.ping_indices
         detected_msg.ping_stamps = source_msg.ping_stamps
         detected_msg.nav_statuses = source_msg.nav_statuses
-        detected_msg.nav_valid = source_msg.nav_valid
         detected_msg.altitudes = source_msg.altitudes
-        detected_msg.altitude_valid = source_msg.altitude_valid
 
         detected_msg.object_classes = []
         detected_msg.object_confidences = []

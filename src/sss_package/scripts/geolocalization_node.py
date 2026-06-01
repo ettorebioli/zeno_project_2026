@@ -26,6 +26,8 @@ from geodetic_functions import ne2ll
 # ============================================================
 # Inserire punti come (latitudine, longitudine).
 MANUAL_POLYGON_POINTS = [
+
+    # allenamento_7_10
     (43.7065117, 10.4750928),
     (43.7062829, 10.4755984),
     (43.7063663, 10.4757727),
@@ -44,7 +46,6 @@ MANUAL_REFERENCE_OBJECTS = [
     {'type': 'boa', 'lat': 43.7064982, 'lon': 10.4754498},
     {'type': 'boa', 'lat': 43.7063935, 'lon': 10.4756603},
     {'type': 'boa', 'lat': 43.7064003, 'lon': 10.4755168},
-
     {'type': 'tubo', 'lat': 43.706569, 'lon': 10.4753291},
     {'type': 'tubo', 'lat': 43.7064866, 'lon': 10.4755785},
     {'type': 'tubo', 'lat': 43.7064439, 'lon': 10.4753747},
@@ -54,20 +55,22 @@ MANUAL_REFERENCE_OBJECTS = [
     {'type': 'tubo', 'lat': 43.7065293, 'lon': 10.4751467}
 
     # allenamento_10
-    # {'type': 'boa', 'lat': 43.7065128, 'lon': 10.4752562},
-    # {'type': 'boa', 'lat': 43.7066204, 'lon': 10.4754251},
-    # {'type': 'boa', 'lat': 43.7066514, 'lon': 10.4752405},
-    # {'type': 'boa', 'lat': 43.7064982, 'lon': 10.4754498},
-    # {'type': 'boa', 'lat': 43.7063935, 'lon': 10.4756603},
-    # {'type': 'boa', 'lat': 43.7064003, 'lon': 10.4755168},
-    #
-    # {'type': 'tubo', 'lat': 43.7065690, 'lon': 10.4753291},
-    # {'type': 'tubo', 'lat': 43.7064866, 'lon': 10.4755785},
-    # {'type': 'tubo', 'lat': 43.7064439, 'lon': 10.4753747},
-    # {'type': 'tubo', 'lat': 43.7066902, 'lon': 10.4753438},
-    # {'type': 'tubo', 'lat': 43.7063470, 'lon': 10.4755799},
-    # {'type': 'tubo', 'lat': 43.7065680, 'lon': 10.4755034},
-    # {'type': 'tubo', 'lat': 43.7065293, 'lon': 10.4751467}
+
+    #{'type': 'boa', 'lat': 43.7065128, 'lon': 10.4752562},
+    #{'type': 'boa', 'lat': 43.7066204, 'lon': 10.4754251},
+    #{'type': 'boa', 'lat': 43.7066514, 'lon': 10.4752405},
+    #{'type': 'boa', 'lat': 43.7064982, 'lon': 10.4754498},
+    #{'type': 'boa', 'lat': 43.7063935, 'lon': 10.4756603},
+    #{'type': 'boa', 'lat': 43.7064003, 'lon': 10.4755168},
+   # 
+    #{'type': 'tubo', 'lat': 43.7065690, 'lon': 10.4753291},
+    #{'type': 'tubo', 'lat': 43.7064866, 'lon': 10.4755785},
+    #{'type': 'tubo', 'lat': 43.7064439, 'lon': 10.4753747},
+    #{'type': 'tubo', 'lat': 43.7066902, 'lon': 10.4753438},
+    #{'type': 'tubo', 'lat': 43.7063470, 'lon': 10.4755799},
+    #{'type': 'tubo', 'lat': 43.7065680, 'lon': 10.4755034},
+    #{'type': 'tubo', 'lat': 43.7065293, 'lon': 10.4751467}
+
 ]
 
 
@@ -134,8 +137,6 @@ class GeolocalizationNode:
         self.update_complete_object_list(geolocated_objects)
         self.update_object_list(geolocated_objects)
         self.publish_object_list()
-        if len(geolocated_objects) == 0:
-            rospy.logwarn("geolocalization_node: nessun oggetto geolocalizzato in questa immagine")
         self.save_geolocated_list_text(geolocated_objects, localization_infos)
 
     def update_complete_object_list(self, geolocated_objects):
@@ -481,17 +482,17 @@ class GeolocalizationNode:
 
         x_body, y_body, z_body = body_position
 
-        north = (cy * cp) * x_body + (cy * sp * sr - sy * cr) * y_body + (cy * sp * cr + sy * sr) * z_body
-        east = (sy * cp) * x_body + (sy * sp * sr + cy * cr) * y_body + (sy * sp * cr - cy * sr) * z_body
-        down = (-sp) * x_body + (cp * sr) * y_body + (cp * cr) * z_body
+        #north = (cy * cp) * x_body + (cy * sp * sr - sy * cr) * y_body + (cy * sp * cr + sy * sr) * z_body
+        #east = (sy * cp) * x_body + (sy * sp * sr + cy * cr) * y_body + (sy * sp * cr - cy * sr) * z_body
+        #down = (-sp) * x_body + (cp * sr) * y_body + (cp * cr) * z_body
 	
 
 	# matrice di rotazione body -> NED (yaw)
 	#x_body, y_body, z_body = body_position
 
-        #north = math.cos(yaw) * x_body - math.sin(yaw) * y_body		# segni!!
-        #east  = math.sin(yaw) * x_body + math.cos(yaw) * y_body		# segni!!
-        #down  = z_body
+        north = math.cos(yaw) * x_body + math.sin(yaw) * y_body		# segni!! (-)
+        east  = math.sin(yaw) * x_body - math.cos(yaw) * y_body		# segni!! (+)
+        down  = z_body
 
         return north, east, down
 

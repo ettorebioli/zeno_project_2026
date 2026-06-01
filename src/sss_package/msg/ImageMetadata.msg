@@ -5,9 +5,7 @@ sensor_msgs/Image image
 uint32[] ping_indices
 time[] ping_stamps
 marta_msgs/NavStatus[] nav_statuses
-bool[] nav_valid
 float32[] altitudes
-bool[] altitude_valid
 
 string[] object_classes
 float32[] object_confidences
