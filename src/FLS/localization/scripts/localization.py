@@ -250,7 +250,7 @@ class FLSLocalizationNode:
             # --------------------------------------------------------
 
             raw_type = str(target_data.get('type', 'unknown')).lower()
-            raw_conf = target_data.get('confidence', 0.5)
+            raw_conf = target_data.get('confidence', 0.0)
 
             # --- LOGICA DEL CLUSTERING ---
             best_global_id = None
