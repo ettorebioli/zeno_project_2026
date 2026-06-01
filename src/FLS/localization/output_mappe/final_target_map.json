@@ -1,0 +1,130 @@
+{
+    "1": {
+        "confidence": 0.0, 
+        "obs_count": 25, 
+        "min_range": 2.3942519037089696, 
+        "lon": 10.475607085797703, 
+        "lat": 43.70674808044544, 
+        "type": "tubo_probabile"
+    }, 
+    "2": {
+        "confidence": 0.27, 
+        "obs_count": 34, 
+        "min_range": 7.431945811239566, 
+        "lon": 10.475688627725305, 
+        "lat": 43.70669983523995, 
+        "type": "boa_probabile"
+    }, 
+    "3": {
+        "confidence": 0.65, 
+        "obs_count": 160, 
+        "min_range": 4.814640539002035, 
+        "lon": 10.47541455462828, 
+        "lat": 43.70660112443277, 
+        "type": "boa_probabile"
+    }, 
+    "4": {
+        "confidence": 1.0, 
+        "obs_count": 72, 
+        "min_range": 5.855982630671451, 
+        "lon": 10.475505869529478, 
+        "lat": 43.706550652992995, 
+        "type": "boa_probabile"
+    }, 
+    "5": {
+        "confidence": 0.8, 
+        "obs_count": 150, 
+        "min_range": 4.654142198558415, 
+        "lon": 10.475424764510755, 
+        "lat": 43.70648502509303, 
+        "type": "boa_probabile"
+    }, 
+    "6": {
+        "confidence": 0.7, 
+        "obs_count": 63, 
+        "min_range": 6.546893665340686, 
+        "lon": 10.475302462588765, 
+        "lat": 43.706560023693356, 
+        "type": "tubo_probabile"
+    }, 
+    "7": {
+        "confidence": 0.75, 
+        "obs_count": 38, 
+        "min_range": 6.032590248429474, 
+        "lon": 10.475332202874508, 
+        "lat": 43.706682431058276, 
+        "type": "tubo_probabile"
+    }, 
+    "8": {
+        "confidence": 0.6, 
+        "obs_count": 111, 
+        "min_range": 4.2658674382448885, 
+        "lon": 10.475206502730472, 
+        "lat": 43.70662991921212, 
+        "type": "boa_probabile"
+    }, 
+    "9": {
+        "confidence": 0.0, 
+        "obs_count": 2, 
+        "min_range": 8.235406561578758, 
+        "lon": 10.475209412776568, 
+        "lat": 43.70679135638801, 
+        "type": "tubo_probabile"
+    }, 
+    "10": {
+        "confidence": 0.7, 
+        "obs_count": 39, 
+        "min_range": 6.4420011013206055, 
+        "lon": 10.47514235008712, 
+        "lat": 43.70655097435717, 
+        "type": "tubo_probabile"
+    }, 
+    "11": {
+        "confidence": 0.6, 
+        "obs_count": 86, 
+        "min_range": 3.9918299244396414, 
+        "lon": 10.475258750809859, 
+        "lat": 43.70651805918846, 
+        "type": "boa_probabile"
+    }, 
+    "12": {
+        "confidence": 0.05, 
+        "obs_count": 52, 
+        "min_range": 5.929228865532919, 
+        "lon": 10.475366761600071, 
+        "lat": 43.70646039397005, 
+        "type": "tubo_probabile"
+    }, 
+    "13": {
+        "confidence": 0.85, 
+        "obs_count": 34, 
+        "min_range": 6.578104074072385, 
+        "lon": 10.475558629204297, 
+        "lat": 43.706472677545385, 
+        "type": "tubo_probabile"
+    }, 
+    "14": {
+        "confidence": 0.55, 
+        "obs_count": 96, 
+        "min_range": 3.8496211000290055, 
+        "lon": 10.475518636983262, 
+        "lat": 43.706404276067765, 
+        "type": "boa_probabile"
+    }, 
+    "15": {
+        "confidence": 1.0, 
+        "obs_count": 56, 
+        "min_range": 4.50573498665697, 
+        "lon": 10.475671719730444, 
+        "lat": 43.70640406743343, 
+        "type": "boa_probabile"
+    }, 
+    "16": {
+        "confidence": 0.93, 
+        "obs_count": 48, 
+        "min_range": 6.41292334478915, 
+        "lon": 10.475583574566052, 
+        "lat": 43.70635761095994, 
+        "type": "tubo_probabile"
+    }
+}
