@@ -10,10 +10,7 @@ import numpy as np
 import os
 import rospkg
 import math
-from marta_msgs.msg import Altitude
-from marta_msgs.msg import NavStatus
 from sss_package.msg import ImageMetadata
-from sensor_msgs.msg import Image as RosImage
 from cv_bridge import CvBridge, CvBridgeError
 
 
@@ -21,25 +18,18 @@ from cv_bridge import CvBridge, CvBridgeError
 # CLASSE PRINCIPALE NODO LIST CREATOR
 # ============================================================
 class ObjectClassificationNode:
+    MAX_CLASSIFICATION_SCORE = 6.0
 
     def __init__(self):
 
 	print("[SSS] object_classification_node.py is active\n")
 
         # inizializzare subscriber/publisher
-        rospy.Subscriber('/waterfall_image_topic', ImageMetadata, self.list_callback)
+        rospy.Subscriber('/waterfall_image_topic', ImageMetadata, self.object_classification_callback)
         self.pub_classified_objects = rospy.Publisher('classified_objects_topic', ImageMetadata, queue_size=200)
 
         # inizializzare CvBridge
         self.bridge = CvBridge()
-
-        # definire parametri Zeno
-        self.latitude   = None
-        self.longitude  = None
-        self.altitude   = None
-        self.yaw_angle  = None
-        self.omega_body = None
-        self.latest_nav = NavStatus()
 
         # definire parametri filtri
         self.log_filter_scale        = float(rospy.get_param('~log_filter_scale', 255.0))
@@ -48,20 +38,17 @@ class ObjectClassificationNode:
         self.gaussian_sigma          = float(rospy.get_param('~gaussian_sigma', 0.0))
         self.clahe_clip_limit        = float(rospy.get_param('~clahe_clip_limit', 2.0))
         self.clahe_tile_grid_size    = int(rospy.get_param('~clahe_tile_grid_size', 8))
-        self.percentile_low          = float(rospy.get_param('~percentile_low', 2.0))
-        self.percentile_high         = float(rospy.get_param('~percentile_high', 98.0))
-
+        
         # definire parametri morfologici
-        self.bright_morph_first_open_kernel_size  = int(rospy.get_param('~bright_morph_first_open_kernel_size', 3))	# pulizia iniziale leggera
-        self.bright_morph_close_kernel_size 	  = int(rospy.get_param('~bright_morph_close_kernel_size', 5))		# chiude piccoli buchi all interno deli oggetti
-        self.bright_morph_final_open_kernel_size  = int(rospy.get_param('~bright_morph_final_open_kernel_size', 5))	# pulizia finale piu forte
-        self.bright_morph_final_close_kernel_size = int(rospy.get_param('~bright_morph_final_close_kernel_size', 9))	# riconnette frammenti dopo la pulizia finale
+        self.bright_morph_first_open_kernel_size  = int(rospy.get_param('~bright_morph_first_open_kernel_size', 3))	 # pulizia iniziale leggera
+        self.bright_morph_first_close_kernel_size = int(rospy.get_param('~bright_morph_first_close_kernel_size', 5)) # chiusura piccoli buchi all'interno degli oggetti
+        self.bright_morph_final_open_kernel_size  = int(rospy.get_param('~bright_morph_final_open_kernel_size', 5))	 # pulizia finale piu' forte
+        self.bright_morph_final_close_kernel_size = int(rospy.get_param('~bright_morph_final_close_kernel_size', 9)) # riconnessione frammenti dopo la pulizia finale
         self.bright_morph_iterations        	  = int(rospy.get_param('~bright_morph_iterations', 1))
-        self.dark_morph_open_kernel_size   	      = int(rospy.get_param('~dark_morph_open_kernel_size', 3))		# rimuove piccoli blob isolati dopo aver riconnesso le ombre
-        self.dark_morph_first_close_kernel_width  = int(rospy.get_param('~dark_morph_first_close_kernel_width', 5))	# connette frammenti prima della pulizia
+
+        self.dark_morph_first_open_kernel_size    = int(rospy.get_param('~dark_morph_first_open_kernel_size', 3))	 # rimozione piccoli blob isolati dopo aver riconnesso le ombre
+        self.dark_morph_first_close_kernel_width  = int(rospy.get_param('~dark_morph_first_close_kernel_width', 5))	 # connette frammenti prima della pulizia
         self.dark_morph_first_close_kernel_height = int(rospy.get_param('~dark_morph_first_close_kernel_height', 3))
-        self.dark_morph_final_close_kernel_width  = int(rospy.get_param('~dark_morph_final_close_kernel_width', 9))	# riconnette frammenti rimasti dopo opening
-        self.dark_morph_final_close_kernel_height = int(rospy.get_param('~dark_morph_final_close_kernel_height', 3))
         self.dark_morph_iterations   		      = int(rospy.get_param('~dark_morph_iterations', 1))
 
         # definire parametri saliency
@@ -71,13 +58,10 @@ class ObjectClassificationNode:
         self.cfar_rank_percentile  = rospy.get_param('~cfar_rank_percentile', 60.0)
         self.cfar_threshold_scale  = rospy.get_param('~cfar_threshold_scale', 1.00)
         self.cfar_threshold_offset = rospy.get_param('~cfar_threshold_offset', 2.0)
-        self.cfar_detect_dark      = rospy.get_param('~cfar_detect_dark', True)
-        self.cfar_pfa              = rospy.get_param('~cfar_pfa', 1.0e-3)
 
         # definire parametri binarizzazione
         self.bright_percentile = rospy.get_param('~bright_percentile', 85.0)
         self.dark_percentile   = rospy.get_param('~dark_percentile', 25.0)
-
 
         # definire parametri detection e classification
         self.sonar_range_m                 = float(rospy.get_param('~sonar_range_m', 25.0))
@@ -85,16 +69,11 @@ class ObjectClassificationNode:
         self.sss_frequency_hz              = float(rospy.get_param('~sss_frequency_hz', 5.0))
         self.alongtrack_beam_angle_deg     = float(rospy.get_param('~alongtrack_beam_angle_deg', 0.3))
         self.alongtrack_beam_angle_rad     = math.radians(self.alongtrack_beam_angle_deg)
-        self.meters_per_pixel_x            = self.sonar_range_m / float(self.sonar_bins_per_side)			# across-track: passo dei bin in slant range
-        self.meters_per_pixel_y            = float(rospy.get_param('~meters_per_pixel_y', 0.125))			# along-track: aggiornato da nav_status a ogni immagine
-        self.auv_velocity_mps              = 0.0
-        self.alongtrack_sampling_m         = 0.0
-        self.alongtrack_beam_footprint_m   = 0.0
+
         self.min_object_area_px            = int(rospy.get_param('~min_object_area_px', 40))				# 40 << minima area dell oggetto stimata
         self.min_shadow_area_px            = int(rospy.get_param('~min_shadow_area_px', 20))				# 20 << minima area dell ombra stimata
         self.max_shadow_alongtrack_gap_m   = float(rospy.get_param('~max_shadow_alongtrack_gap_m', 2.5))
         self.max_shadow_acrosstrack_gap_m  = float(rospy.get_param('~max_shadow_acrosstrack_gap_m', 8.0))
-        self.shadow_height_scale           = float(rospy.get_param('~shadow_height_scale', 1.0))
         self.min_classification_confidence = float(rospy.get_param('~min_classification_confidence', 0.35))
 
 
@@ -140,101 +119,77 @@ class ObjectClassificationNode:
         
         self.image_index = 0
 
-        pass
-
-# ________________________________________________________________________________________________________________________________
-
-
-    # ========================================================
-    # LETTURA ALTITUDE
-    # ========================================================
-    def read_altitude_from_bag(self, msg):
-        # estrarre topic altitude
-        self.altitude = msg.altitude
-        pass
-
-
-    # ========================================================
-    # LETTURA NAV_STATUS
-    # ========================================================
-    def read_nav_status_from_bag(self, msg):
-        # estrarre topic nav_status
-        self.latitude   = msg.position.latitude
-        self.longitude  = msg.position.longitude
-        self.yaw_angle  = msg.orientation.yaw            # radianti
-        self.omega_body = msg.omega_body.z
-        self.latest_nav = msg
-        pass
-
-
 # ________________________________________________________________________________________________________________________________
 
 
 
     # ========================================================
-    # CALLBACK PER CREAZIONE LISTA
+    # CALLBACK PER OBJECT CLASSIFICATION
     # ========================================================
-    def list_callback(self, msg):
-        # 1. ROS Image -> OpenCV grayscale image
+    def object_classification_callback(self, msg):
+        # 1. convertire immagine
         image = self.ros_image_to_cv2(msg.image)
-        if image is None:
-            return
-
-        # Risoluzione across-track semplificata: 25 m / 1000 bin = 0.025 m/px.
-        self.meters_per_pixel_x = self.sonar_range_m / float(self.sonar_bins_per_side)
-
-        # Risoluzione along-track semplificata:
-        # - la velocita arriva dal NavStatus della riga centrale dell'immagine
-        # - il passo tra ping e velocita / frequenza SSS
-        # - il footprint del fascio e range massimo * ampiezza angolare in radianti
-        # - uso il peggiore dei due contributi come risoluzione effettiva
-        nav_status = msg.nav_statuses[int(image.shape[0] / 2)]
-        self.auv_velocity_mps = math.sqrt((nav_status.ned_speed.x * nav_status.ned_speed.x) + (nav_status.ned_speed.y * nav_status.ned_speed.y))
-        self.alongtrack_sampling_m = self.auv_velocity_mps / self.sss_frequency_hz
-        self.alongtrack_beam_footprint_m = self.sonar_range_m * self.alongtrack_beam_angle_rad
-        self.meters_per_pixel_y = max(self.alongtrack_sampling_m, self.alongtrack_beam_footprint_m)
 
         # 2. filtering pipeline	
         #image = self.apply_log_filter(image)
         #image = self.apply_gaussian_filter(image)
         #image = self.apply_median_filter(image)
         #image = self.apply_clahe_filter(image)
-        #image = self.apply_percentile_filter(image)
 
         # 3. saliency
-        # OpenCV spectral residual saliency
+        # opzione 1) OpenCV spectral residual saliency
         #saliency_map = self.compute_spectral_residual_saliency(image)
 
-        # 1D OS-CFAR saliency
-        saliency_map = self.compute_os_cfar_1d_saliency(image)
+        # opzione 2) OS-CFAR 1D saliency separata per oggetti luminosi e ombre scure
+        bright_saliency_map, dark_saliency_map = self.compute_os_cfar_1d_saliency_maps(image)
 
-        # 4. bright/dark binary maps
-        saliency_binary_map, bright_map, dark_map, bright_and_salient_map, dark_and_salient_map = self.create_bright_dark_maps(image, saliency_map)
+        # 4. bright/dark binary maps e binary saliency maps
+        bright_map, dark_map = self.create_binary_maps(image)
+        bright_saliency_binary_map = self.create_saliency_binary_map(bright_saliency_map)
+        dark_saliency_binary_map = self.create_saliency_binary_map(dark_saliency_map)
 
-        # 5. classificazione oggetti usando oggetto luminoso + ombra scura
+        # 5. bright/dark binary AND salient maps
+        bright_and_salient_map = cv2.bitwise_and(bright_map, bright_saliency_binary_map)
+        dark_and_salient_map   = cv2.bitwise_and(dark_map, dark_saliency_binary_map)
+
+        # 6. morphological cleaning
+        bright_and_salient_map = self.morphological_cleaning_bright(bright_and_salient_map)
+        dark_and_salient_map   = self.morphological_cleaning_dark(dark_and_salient_map)
+
+        # 7. risoluzione across-track
+        self.meters_per_pixel_x = self.sonar_range_m / float(self.sonar_bins_per_side)            # Ry = 25 m / 1000 bin
+
+        # 8. risoluzione along-track
+        nav_status = msg.nav_statuses[int(image.shape[0] / 2)]
+        self.auv_velocity_mps = math.sqrt((nav_status.ned_speed.x * nav_status.ned_speed.x) + (nav_status.ned_speed.y * nav_status.ned_speed.y))
+        self.alongtrack_sampling_m       = self.auv_velocity_mps / self.sss_frequency_hz          # s = v / fp
+        self.alongtrack_beam_footprint_m = self.sonar_range_m * self.alongtrack_beam_angle_rad    # Rx = R * ampiezza angolare along-track
+        self.meters_per_pixel_y = max(self.alongtrack_sampling_m, self.alongtrack_beam_footprint_m)
+
+        # 9. classificazione oggetti usando oggetto luminoso + ombra scura
         classifications = self.detect_and_classify_objects(bright_and_salient_map, dark_and_salient_map)
 
-        # 6. salvataggio risultati
+        # 10. salvataggio risultati
         image_index = self.image_index
         self.save_filtered_image(image, image_index)
-        self.save_saliency_image(saliency_map, image_index)
-        self.save_saliency_binary_image(saliency_binary_map, image_index)
+        self.save_bright_saliency_image(bright_saliency_map, image_index)
+        self.save_dark_saliency_image(dark_saliency_map, image_index)
+        self.save_bright_saliency_binary_image(bright_saliency_binary_map, image_index)
+        self.save_dark_saliency_binary_image(dark_saliency_binary_map, image_index)
         self.save_bright_map_image(bright_map, image_index)
         self.save_dark_map_image(dark_map, image_index)
         self.save_bright_and_salient_map_image(bright_and_salient_map, image_index)
         self.save_dark_and_salient_map_image(dark_and_salient_map, image_index)
         self.save_classification_image(image, classifications, image_index)
         self.save_classification_text(classifications, image_index)
+
         classified_msg = self.build_classified_objects_message(msg, classifications)
         self.pub_classified_objects.publish(classified_msg)
-        rospy.loginfo("[SSS] classified_objects_topic: pubblicata immagine {:03d} con {} oggetti classificati".format(
-            image_index,
-            len(classifications)
-        ))
+        print("[SSS] classified_objects_topic: pubblicata immagine {:03d} con {} oggetti classificati".format(image_index, len(classifications)))
         if len(classifications) == 0:
-            rospy.logwarn("[SSS] object_classification_node: nessun oggetto classificato nell'immagine {:03d}".format(image_index))
-        self.image_index += 1
+            print("[SSS] object_classification_node: nessun oggetto classificato nell'immagine {:03d}".format(image_index))
 
+        self.image_index += 1
         return classifications
 
     def build_classified_objects_message(self, source_msg, classifications):
@@ -270,26 +225,19 @@ class ObjectClassificationNode:
 
         return detected_msg
 
-    # ========================================================
-    # CALLBACK PER ALTITUDE DI ZENO
-    # ========================================================
-    def altitude_callback(self, msg):
-        # 1. estrai altitude
-        self.read_altitude_from_bag(msg)
-	# 2. plot altitude        
-	#self.store_altitude_sample()
-        pass
-
+# ________________________________________________________________________________________________________________________________
 
     # ========================================================
-    # CALLBACK PER NAV_STATUS DI ZENO
+    # UTILITIES
     # ========================================================
-    def zeno_callback(self, msg):
-        # 1. estrai latitudine, longitudine e yaw dal nav_status
-        self.read_nav_status_from_bag(msg)
-        # 2. plot della traiettoria
-        #self.plot_auv_trajectory(nav_status_stream)
-        pass
+
+    def make_positive_odd(self, value):
+        value = int(value)
+        if value < 1:
+            value = 1
+        if value % 2 == 0:
+            value += 1
+        return value
 
 
 # ________________________________________________________________________________________________________________________________
@@ -301,7 +249,7 @@ class ObjectClassificationNode:
         try:
             image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='mono8')
         except CvBridgeError as exc:
-            rospy.logerr("Errore conversione ROS Image -> OpenCV: {}".format(exc))
+            print("Errore conversione ROS Image -> OpenCV: {}".format(exc))
             return None
         return np.asarray(image, dtype=np.uint8)
 
@@ -322,52 +270,28 @@ class ObjectClassificationNode:
         return np.clip((log_image / max_log) * self.log_filter_scale, 0, 255).astype(np.uint8)
 
     def apply_median_filter(self, image):
-        kernel_size = int(self.median_kernel_size)
-        if kernel_size < 1:
-            return image
-        if kernel_size % 2 == 0:
-            kernel_size += 1
+        kernel_size = self.make_positive_odd(self.median_kernel_size)
         return cv2.medianBlur(self.normalize_uint8(image), kernel_size)
 
     def apply_gaussian_filter(self, image):
-        kernel_size = int(self.gaussian_kernel_size)
-        if kernel_size < 1:
-            return image
-        if kernel_size % 2 == 0:
-            kernel_size += 1
+        kernel_size = self.make_positive_odd(self.gaussian_kernel_size)
         return cv2.GaussianBlur(self.normalize_uint8(image), (kernel_size, kernel_size), self.gaussian_sigma)
 
     def apply_clahe_filter(self, image):
-        tile_grid_size = int(self.clahe_tile_grid_size)
-        if tile_grid_size < 1:
-            tile_grid_size = 1
+        tile_grid_size = self.make_positive_odd(self.clahe_tile_grid_size)
 	clahe = cv2.createCLAHE(clipLimit = self.clahe_clip_limit, tileGridSize = (tile_grid_size, tile_grid_size))
         return clahe.apply(self.normalize_uint8(image))
 
-    def apply_percentile_filter(self, image):
-        image = self.normalize_uint8(image).astype(np.float32)
-        low_percentile  = max(0.0, min(100.0, float(self.percentile_low)))
-        high_percentile = max(0.0, min(100.0, float(self.percentile_high)))
-        if high_percentile <= low_percentile:
-            return image.astype(np.uint8)
 
-        low_value  = np.percentile(image, low_percentile)
-        high_value = np.percentile(image, high_percentile)
-        if high_value <= low_value:
-            return image.astype(np.uint8)
-
-        image = np.clip(image, low_value, high_value)
-        image = (image - low_value) / (high_value - low_value)
-        return np.clip(image * 255.0, 0, 255).astype(np.uint8)
 
     # ========================================================
     # SALIENCY MAP
     # ========================================================
     def compute_spectral_residual_saliency(self, image):
-	# normalizzare immagine in uint8 [0, 255]
+	    # normalizzare immagine in uint8 [0, 255]
         image = self.normalize_uint8(image)
 
-	# creare mappa di salienza
+	    # creare mappa di salienza
         saliency = cv2.saliency.StaticSaliencySpectralResidual_create()
         success, saliency_map = saliency.computeSaliency(image)
         if not success:
@@ -377,40 +301,44 @@ class ObjectClassificationNode:
         return saliency_map
 
 
-    def compute_os_cfar_1d_saliency(self, image):
-	# normalizzare immagine in uint8 [0, 255]
+    def compute_os_cfar_1d_saliency_maps(self, image):
+	    # normalizzare immagine in uint8 [0, 255]
         image = self.normalize_uint8(image)
 
-        # Calcolare la risposta CFAR sui ritorni luminosi dell'immagine originale.
+        # calcolare la risposta CFAR sugli oggetti luminosi 
         bright_response = self.compute_os_cfar_1d_response(image)
 
-        # Se non si vogliono rilevare zone scure, usare solo la risposta luminosa.
-        if not self.cfar_detect_dark:
-            return bright_response
-
-        # Invertire l'immagine: le ombre diventano valori alti rilevabili dallo stesso CFAR.
+        # invertire l'immagine: le ombre diventano valori alti rilevabili
         inverted_image = 255 - image
 
-        # Calcolare la risposta CFAR delle zone scure sull'immagine invertita.
+        # calcolare la risposta CFAR sulle ombre diventate luminose
         dark_response = self.compute_os_cfar_1d_response(inverted_image)
 
-        # Unire risposta bright e dark mantenendo, pixel per pixel, il valore piu forte.
+        return bright_response, dark_response
+
+
+    def compute_os_cfar_1d_saliency(self, image):
+        bright_response, dark_response = self.compute_os_cfar_1d_saliency_maps(image)
+        # unire risposta bright e dark mantenendo il valore piu forte
         return np.maximum(bright_response, dark_response).astype(np.uint8)
+
 
     def compute_os_cfar_1d_response(self, image):
         # portare l'immagine in float32 per calcolare soglie e differenze
-        image = self.normalize_uint8(image)
-        image_float = image.astype(np.float32)
+        image_float = self.normalize_uint8(image).astype(np.float32)
         height, width = image_float.shape
 
-        # parametri della finestra CFAR: celle training, celle guard e rank OS
+        # parametri della finestra CFAR: train|guard|CUT|guard|train
         train = max(1, int(self.cfar_train_cells))
         guard = max(0, int(self.cfar_guard_cells))
         radius = train + guard
 
+        # rank = indice corrispondente al percentile
         rank_percentile = float(self.cfar_rank_percentile)
         rank_percentile = max(0.0, min(100.0, rank_percentile))
+        # convertire il percentile in un indice di un array per usarlo in partition()
         rank = int(round((rank_percentile / 100.0) * ((2 * train) - 1)))
+        # il massimo indice valido e' (2 * train) - 1
         rank = max(0, min((2 * train) - 1, rank))
 
         # parametri della soglia adattiva
@@ -435,166 +363,140 @@ class ObjectClassificationNode:
                 noise_estimate = np.partition(training_cells, rank)[rank]
                 threshold = noise_estimate * threshold_scale + threshold_offset
 
+                # controllare se l'intensita' del CUT e' maggiore della soglia
+                # se il pixel e' maggiore della soglia, salvare quanto piu' forte e'
                 if data[col] > threshold:
                     response[row, col] = data[col] - threshold
 
-        # Se nessun pixel e stato rilevato, restituire una mappa nera.
+        # se nessun pixel e stato rilevato, restituire una mappa nera
         max_response = float(np.max(response))
         if max_response <= 0.0:
-            return np.zeros_like(image, dtype=np.uint8)
+            return np.zeros_like(image_float, dtype=np.uint8)
 
-        # Normalizzare la risposta in [0, 255] per salvarla/combinarla come immagine uint8.
+        # normalizzare la risposta in [0, 255] per salvarla/combinarla come immagine uint8
         return cv2.normalize(response, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
 
     # ========================================================
     # BINARY MAPS
     # ========================================================
-    def create_bright_dark_maps(self, image, saliency_map):
-	# normalizzare immagine in uint8 [0, 255]
+    def create_binary_maps(self, image):
+	    # normalizzare immagine in uint8 [0, 255]
         image = self.normalize_uint8(image)
-
-	# creare mappa binaria di salienza
-        if saliency_map is None:
-            empty_map = np.zeros_like(image, dtype=np.uint8)
-            return empty_map, empty_map, empty_map, empty_map, empty_map
-
-	# normalizzare immagine in uint8 [0, 255]
-        saliency_map = self.normalize_uint8(saliency_map)
-        # considerare solo i pixel con salienza non nulla
-        nonzero_saliency = saliency_map[saliency_map > 0]
-        # se non ci sono pixel salienti, restituire una mappa binaria completamente nera
-        if nonzero_saliency.size == 0:
-            saliency_binary = np.zeros_like(saliency_map, dtype=np.uint8)
-        else:
-	    # calcolare una soglia dinamica solo sui pixel salienti non nulli
-            threshold = np.percentile(nonzero_saliency, self.saliency_percentile)
-	    # creare una maschera binaria: 1 dove la salienza e sopra la soglia, 0 altrove
-            saliency_binary = (saliency_map > threshold).astype(np.uint8) * 255
-
-	# calcolare una soglia dinamica per pixel "molto luminosi" e "molto scuri"
+        # calcolare una soglia dinamica
         bright_threshold = np.percentile(image, self.bright_percentile)
         dark_threshold   = np.percentile(image, self.dark_percentile)
-	# creare maschera binaria
+        # creare maschera binaria: 1 dove la salienza e' sopra la soglia, 0 altrove
         bright_map = (image >= bright_threshold).astype(np.uint8) * 255
         dark_map   = (image <= dark_threshold).astype(np.uint8) * 255
 
-        # mantenere solo pixel salienti
-        bright_and_salient_map = cv2.bitwise_and(bright_map, saliency_binary)
-        #dark_and_salient_map   = cv2.bitwise_and(dark_map, saliency_binary)
-
-	# pulizia morfologica
-        #bright_and_salient_map = self.morphological_cleaning_bright(bright_and_salient_map)
-        bright_and_salient_map = self.morphological_cleaning_bright(saliency_binary)	# usare saliency binary al posto di bright_and_salient
-        #dark_and_salient_map   = self.morphological_cleaning_bright(dark_and_salient_map)
-        dark_and_salient_map   = self.morphological_cleaning_dark(dark_map)		# non e propriamente dark_and_salient...
-        return saliency_binary, bright_map, dark_map, bright_and_salient_map, dark_and_salient_map
+        return bright_map, dark_map
 
 
-    def make_positive_odd(self, value):
-        value = int(value)
-        if value < 1:
-            value = 1
-        if value % 2 == 0:
-            value += 1
-        return value
+    def create_saliency_binary_map(self, saliency_map):
+	    # normalizzare immagine in uint8 [0, 255]
+        saliency_map = self.normalize_uint8(saliency_map)
+        # considerare solo i pixel con salienza non nulla
+        nonzero_saliency = saliency_map[saliency_map > 0]
+        if nonzero_saliency.size == 0:
+            return np.zeros_like(saliency_map, dtype=np.uint8)
+        # calcolare una soglia dinamica solo sui pixel salienti non nulli
+        salient_threshold = np.percentile(nonzero_saliency, self.saliency_percentile)
+        # creare una maschera binaria: 1 dove la salienza e' sopra la soglia, 0 altrove
+        saliency_binary = (saliency_map > salient_threshold).astype(np.uint8) * 255
+
+        return saliency_binary
 
 
     def morphological_cleaning_bright(self, binary_map):
         # open-close-open-close: pulire rumore, riconnettere oggetti, ripulire e chiudere frammenti rimasti
-        first_open_kernel_size = self.make_positive_odd(self.bright_morph_first_open_kernel_size)
-        close_kernel_size      = self.make_positive_odd(self.bright_morph_close_kernel_size)
-        final_open_kernel_size = self.make_positive_odd(self.bright_morph_final_open_kernel_size)
+        first_open_kernel_size  = self.make_positive_odd(self.bright_morph_first_open_kernel_size)
+        first_close_kernel_size = self.make_positive_odd(self.bright_morph_first_close_kernel_size)
+        final_open_kernel_size  = self.make_positive_odd(self.bright_morph_final_open_kernel_size)
         final_close_kernel_size = self.make_positive_odd(self.bright_morph_final_close_kernel_size)
-        iterations  = int(self.bright_morph_iterations)
-        if iterations < 1:
-            iterations = 1
+        iterations = int(self.bright_morph_iterations)
 
-	# generare kernel
+        # generare kernel
         first_open_kernel  = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (first_open_kernel_size, first_open_kernel_size))
-	close_kernel       = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close_kernel_size, close_kernel_size))
+        first_close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (first_close_kernel_size, first_close_kernel_size))
         final_open_kernel  = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (final_open_kernel_size, final_open_kernel_size))
         final_close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (final_close_kernel_size, final_close_kernel_size))
-	# opening: eliminare piccoli blob bianchi (rumore) e separare regioni sottilmente collegate
+        # opening: eliminare piccoli blob bianchi (rumore) e separare regioni sottilmente collegate
         binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_OPEN, first_open_kernel, iterations=iterations)
-	# closing: chiudere piccoli buchi neri e collegare regioni vicine
-        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, close_kernel, iterations=iterations)
-	# opening finale: rimuovere piccoli artefatti creati o rimasti dopo il closing
+        # closing: chiudere piccoli buchi neri e collegare regioni vicine
+        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, first_close_kernel, iterations=iterations)
+        # opening finale: rimuovere piccoli blob bianchi creati o rimasti dopo il closing
         binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_OPEN, final_open_kernel, iterations=iterations)
-	# closing finale: riconnettere frammenti utili rimasti dopo l opening finale
+        # closing finale: riconnettere frammenti utili rimasti dopo l opening finale
         binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, final_close_kernel, iterations=iterations)
         return binary_map
 
 
     def morphological_cleaning_dark(self, binary_map):
-        # close-open-close: riconnettere ombre, pulire rumore, poi riconnettere i frammenti rimasti
+        # close-open: riconnettere ombre e pulire rumore
         first_close_kernel_width  = self.make_positive_odd(self.dark_morph_first_close_kernel_width)
         first_close_kernel_height = self.make_positive_odd(self.dark_morph_first_close_kernel_height)
-        final_close_kernel_width  = self.make_positive_odd(self.dark_morph_final_close_kernel_width)
-        final_close_kernel_height = self.make_positive_odd(self.dark_morph_final_close_kernel_height)
-        open_kernel_size          = self.make_positive_odd(self.dark_morph_open_kernel_size)
-        iterations                = int(self.dark_morph_iterations)
-        if iterations < 1:
-            iterations = 1
+        first_open_kernel_size    = self.make_positive_odd(self.dark_morph_first_open_kernel_size)
+        iterations = int(self.dark_morph_iterations)
 
+        # generare kernel
+        first_open_kernel  = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (first_open_kernel_size, first_open_kernel_size))
         first_close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (first_close_kernel_width, first_close_kernel_height))
-        binary_map 	   = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, first_close_kernel, iterations=iterations)
-
-        if open_kernel_size > 1:
-            open_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (open_kernel_size, open_kernel_size))
-            binary_map  = cv2.morphologyEx(binary_map, cv2.MORPH_OPEN, open_kernel, iterations=iterations)
-
-        #final_close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (final_close_kernel_width, final_close_kernel_height))
-        #binary_map 	    = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, final_close_kernel, iterations=iterations)
+        # closing: chiudere piccoli buchi neri e collegare regioni vicine
+        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, first_close_kernel, iterations=iterations)
+        # opening: rimuovere piccoli blob bianchi creati o rimasti dopo il closing
+        binary_map  = cv2.morphologyEx(binary_map, cv2.MORPH_OPEN, first_open_kernel, iterations=iterations)
         return binary_map
+
 
 
     # ========================================================
     # CLASSIFICAZIONE OGGETTI
     # ========================================================
     def extract_blobs(self, binary_map, min_area_px, blob_type):
-	# normalizzare immagine in uint8 [0, 255]
+	    # normalizzare immagine in uint8 [0, 255]
         binary_map = self.normalize_uint8(binary_map)
-	# cercare componenti connesse
         _, binary_map = cv2.threshold(binary_map, 0, 255, cv2.THRESH_BINARY)
 
         # etichettare tutte le regioni bianche connesse nella mappa binaria
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary_map, connectivity=8)	# 8, pixel connesso anche in diagonale
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary_map, connectivity=8)	# 8 = pixel connesso anche in diagonale
 
         blobs = []
 
-        # saltare label 0 perche rappresenta lo sfondo nero
+        # saltare label 0 perche' rappresenta lo sfondo nero
         for label in range(1, num_labels):
             # scartare componenti troppo piccole per essere oggetti/ombre
-            area = int(stats[label, cv2.CC_STAT_AREA])								# CC_STAT_AREA = area in pixel, restituita da connectedComponentsWithStats()
-            if area < min_area_px:
+            area = int(stats[label, cv2.CC_STAT_AREA])							# CC_STAT_AREA = area in pixel, restituita da connectedComponentsWithStats()
+            if area < min_area_px:                                              # filtro veloce che conta quanti pixel compongono area
                 continue
 
             # creare una maschera isolata per la componente corrente
-            component_mask = np.zeros_like(binary_map, dtype=np.uint8)						# matrice di zeri
+            component_mask = np.zeros_like(binary_map, dtype=np.uint8)			# matrice di zeri
             component_mask[labels == label] = 255								# inserire 255 nella matrice di zeri in corrispondenza del blob
 
             # estrarre il (primo) contorno della componente per calcolare geometria, area e rettangolo minimo
-	    contours = cv2.findContours(component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-	    contours = contours[0] if len(contours) == 2 else contours[1]
+            contours = cv2.findContours(component_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)  # C_A_S = considera solo i vertici
+            contours = contours[0] if len(contours) == 2 else contours[1]
             if not contours:
                 continue
-	    contour = contours[0]
+            contour = contours[0]
+
             # area del contorno in pixel quadrati
-	    contour_area_px = float(cv2.contourArea(contour))
-	    if contour_area_px <= 0.0:
-	        continue
+            contour_area_px = float(cv2.contourArea(contour))                   # misura area in pixel all'interno del contorno
+            if contour_area_px <= 0.0:
+                continue
 
             # rettangolo orientato in pixel: centro, lati e angolo inclinazione
             pixel_rect = cv2.minAreaRect(contour)
             (cx_px, cy_px), (w_px, h_px), angle_px = pixel_rect
-	    # salvare dimensioni massime e minime del rettangolo in pixel
+            # salvare dimensioni massime e minime del rettangolo in pixel
             max_dimension_px = float(max(w_px, h_px))
             min_dimension_px = float(min(w_px, h_px))
             if min_dimension_px <= 0.0:
                 continue
 
-            # convertire il contorno da pixel a metri usando scale diverse x/y del sonar
+            # con bbox inclinate e risoluzioni diverse sui due assi, la conversione pixel->metro non e' immediata
+            # trasformare il contorno in coordinate reali (metri)
             metric_contour = contour.astype(np.float32).copy()
             metric_contour[:, :, 0] *= self.meters_per_pixel_x
             metric_contour[:, :, 1] *= self.meters_per_pixel_y
@@ -602,7 +504,7 @@ class ObjectClassificationNode:
             # rettangolo orientato in metri: centro, lati e angolo inclinazione
             metric_rect = cv2.minAreaRect(metric_contour)
             (_, _), (w_m, h_m), angle_m = metric_rect
-	    # salvare dimensioni massime e minime del rettangolo in metri
+            # salvare dimensioni massime e minime del rettangolo in metri
             max_dimension_m = float(max(w_m, h_m))
             min_dimension_m = float(min(w_m, h_m))
             if min_dimension_m <= 0.0:
@@ -615,7 +517,6 @@ class ObjectClassificationNode:
             blobs.append({
                 'id': int(label),
                 'type': blob_type,
-                'area_px': area,
                 'area_m2': contour_area_m2,
                 'area_px': contour_area_px,
                 'centroid': (float(cx_px), float(cy_px)),
@@ -635,8 +536,8 @@ class ObjectClassificationNode:
                 'angle': float(angle_m),
                 'contour': contour
             })
-
         return blobs
+
 
     def is_shadow_candidate_for_object(self, obj, shadow, nadir_column):
         # leggere i centroidi in pixel di oggetto e ombra
@@ -647,11 +548,11 @@ class ObjectClassificationNode:
         obj_range    = abs(obj_x - nadir_column)
         shadow_range = abs(shadow_x - nadir_column)
 
-        # ombra deve essere piu lontana dal nadir rispetto all oggetto
+        # 1) ombra deve essere piu' lontana dal nadir rispetto all'oggetto
         if shadow_range <= obj_range:
             return False
 
-        # oggetto e ombra devono stare dallo stesso lato del nadir
+        # 2) oggetto e ombra devono stare dallo stesso lato del nadir
         if (obj_x - nadir_column) * (shadow_x - nadir_column) < 0.0:
             return False
 
@@ -659,7 +560,7 @@ class ObjectClassificationNode:
         alongtrack_gap_m  = abs(shadow_y - obj_y) * self.meters_per_pixel_y
         acrosstrack_gap_m = (shadow_range - obj_range) * self.meters_per_pixel_x
 
-        # scartare coppie troppo lontane per essere un oggetto e la sua ombra
+        # 3) scartare coppie troppo lontane per essere un oggetto e la sua ombra
         if alongtrack_gap_m > self.max_shadow_alongtrack_gap_m:
             return False
         if acrosstrack_gap_m > self.max_shadow_acrosstrack_gap_m:
@@ -677,7 +578,6 @@ class ObjectClassificationNode:
         # distanze in metri usate per stimare la qualita della coppia
         acrosstrack_gap_m = max(0.0, (shadow_range - obj_range) * self.meters_per_pixel_x)
         alongtrack_gap_m  = abs(shadow_y - obj_y) * self.meters_per_pixel_y
-        shadow_area_ratio = shadow['area_px'] / float(max(obj['area_px'], 1))
 
         # punteggio semplice: 1 punto per ogni condizione buona della coppia oggetto-ombra
         score = 0.0
@@ -685,12 +585,10 @@ class ObjectClassificationNode:
             score += 1.0
         if acrosstrack_gap_m <= 0.5 * self.max_shadow_acrosstrack_gap_m:
             score += 1.0
-        if shadow_area_ratio >= 0.25:
-            score += 1.0
         return score
 
     def choose_best_shadow(self, obj, shadows, nadir_column):
-        # cercare ombra con punteggio migliore per l oggetto
+        # cercare ombra con punteggio migliore per l'oggetto
         best_shadow = None
         best_score = -1.0
         for shadow in shadows:
@@ -706,31 +604,29 @@ class ObjectClassificationNode:
         return best_shadow, best_score
 
     def score_interval(self, value, min_value, max_value):
-        # restituire 1 punto se il valore cade dentro l intervallo, altrimenti 0
+        # restituire 1 punto se il valore cade dentro l'intervallo, altrimenti 0
         if min_value <= value <= max_value:
             return 1.0
         return 0.0
 
-    def score_tube(self, obj, shadow, estimated_height_m, pair_score):
-        # tubo atteso e lungo, stretto e con ombra coerente con un oggetto allungato
+    def score_tube(self, obj, shadow, pair_score):
+        # tubo atteso e' lungo, stretto e con ombra coerente con un oggetto allungato
         shadow_ratio = shadow['max_dimension_m'] / max(obj['max_dimension_m'], 0.001)
         score = pair_score
-        score += self.score_interval(obj['max_dimension_m'], 2.0, 4.0)				# intervallo di dimensioni massime dell oggetto ammissibili
-        score += self.score_interval(obj['min_dimension_m'], 0.4, 1.1)				# intervallo di dimensioni minime  dell oggetto ammissibili
-        score += self.score_interval(obj['aspect_ratio'], 2.0, 10.0)				# dimensioni bbox descrivono la forma del blob
+        score += self.score_interval(obj['max_dimension_m'], 2.0, 4.0)			# intervallo di dimensioni massime dell oggetto ammissibili
+        score += self.score_interval(obj['min_dimension_m'], 0.4, 1.1)			# intervallo di dimensioni minime  dell oggetto ammissibili
+        score += self.score_interval(obj['aspect_ratio'], 2.0, 10.0)			# dimensioni bbox descrivono la forma del blob (max_dimension_m / min_dimension_m)
         score += self.score_interval(shadow_ratio, 0.8, 4.0)					# rapporto ombra/oggetto per verificare che ombra non sia troppo piccola rispetto all oggetto
-        score += self.score_interval(estimated_height_m, 0.0, 1.3)				# misurare ombra per stimare altezza oggetto
         return score
 
-    def score_buoy(self, obj, shadow, estimated_height_m, pair_score):
-        # boa attesa e piu compatta e ombra abbastanza lunga rispetto all oggetto
+    def score_buoy(self, obj, shadow, pair_score):
+        # boa attesa e' piu' compatta e ombra abbastanza lunga rispetto all oggetto
         shadow_ratio = shadow['max_dimension_m'] / max(obj['max_dimension_m'], 0.001)
         score = pair_score
-        score += self.score_interval(obj['max_dimension_m'], 0.3, 1.6)				# intervallo di dimensioni massime dell oggetto ammissibili
-        score += self.score_interval(obj['min_dimension_m'], 0.3, 1.2)				# intervallo di dimensioni minime  dell oggetto ammissibili
-        score += self.score_interval(obj['aspect_ratio'], 1.0, 2.0)				# dimensioni bbox descrivono la forma del blob
+        score += self.score_interval(obj['max_dimension_m'], 0.3, 1.6)			# intervallo di dimensioni massime dell oggetto ammissibili
+        score += self.score_interval(obj['min_dimension_m'], 0.3, 1.2)			# intervallo di dimensioni minime  dell oggetto ammissibili
+        score += self.score_interval(obj['aspect_ratio'], 1.0, 2.0)				# dimensioni bbox descrivono la forma del blob (max_dimension_m / min_dimension_m)
         score += self.score_interval(shadow_ratio, 1.0, 5.0)					# rapporto ombra/oggetto per verificare che ombra non sia troppo piccola rispetto all oggetto
-        score += self.score_interval(estimated_height_m, 0.8, 2.8)				# misurare ombra per stimare altezza oggetto
         return score
 
     def detect_and_classify_objects(self, bright_map, dark_map):
@@ -744,19 +640,18 @@ class ObjectClassificationNode:
 
         detections = []
         for obj in objects:
-            # associare all oggetto l ombra piu plausibile
+            # associare all'oggetto l'ombra piu' plausibile
             shadow, pair_score = self.choose_best_shadow(obj, shadows, nadir_column)
             if shadow is None:
                 continue
 
-            # stimare altezza e calcolare punteggi separati per tubo e boa
-            estimated_height_m = shadow['max_dimension_m'] * self.shadow_height_scale
-            tube_score = self.score_tube(obj, shadow, estimated_height_m, pair_score)
-            buoy_score = self.score_buoy(obj, shadow, estimated_height_m, pair_score)
+            # calcolare punteggi separati per tubo e boa
+            tube_score = self.score_tube(obj, shadow, pair_score)
+            buoy_score = self.score_buoy(obj, shadow, pair_score)
 
             # usare il punteggio migliore come base per la confidenza finale
             max_score = max(tube_score, buoy_score)
-            confidence = max_score / 8.0						# 8 e il massimo punteggio ottenibile 
+            confidence = max_score / self.MAX_CLASSIFICATION_SCORE
 
             # sotto soglia la detection resta ignota, sopra soglia vince il punteggio maggiore
             if confidence < self.min_classification_confidence:
@@ -793,50 +688,20 @@ class ObjectClassificationNode:
 
             detections.append({
                 'classification': classification,
-                'confidence': round(float(max(0.0, min(1.0, confidence))), 3),
+                'confidence': round(float(confidence), 3),
                 'tube_score': round(float(tube_score), 3),
                 'buoy_score': round(float(buoy_score), 3),
                 'pair_score': round(float(pair_score), 3),
-                'estimated_height_m': round(float(estimated_height_m), 3),
                 'object': object_data,
                 'shadow': shadow_data
             })
 
-        # restituire prima le detection piu affidabili
-        detections.sort(key=lambda item: item['confidence'], reverse=True)
         return detections
 
     def rotated_bbox_points(self, pixel_rect):
         # convertire il rettangolo orientato di OpenCV nei quattro vertici
         box = cv2.boxPoints(pixel_rect)
         return [[int(round(point[0])), int(round(point[1]))] for point in box]
-
-
-
-    # ========================================================
-    # GESTIONE OGGETTI RICONOSCIUTI IN PIU IMMAGINI
-    # ========================================================
-    def match_objects_across_frames(self, new_objects):
-        # verificare se oggetti già visti in frame precedenti
-        return
-
-    def resolve_conflicts(self, object_history):
-        # gestire classificazioni discordanti dello stesso oggetto
-        return
-
-    def remove_duplicates(self, object_list):
-        # eliminare oggetti ridondanti basati su distanza spaziale
-        return
-
-    # ========================================================
-    # OUTPUT FINALE
-    # ========================================================
-    def generate_final_object_list(self):
-        # creare lista finale:
-        # - tipo oggetto (tubo/boa)
-        # - confidenza
-        # - latitudine/longitudine
-        pass
 
 
 # ________________________________________________________________________________________________________________________________
@@ -849,7 +714,7 @@ class ObjectClassificationNode:
         filename = os.path.join(folder, "{}_{:03d}.png".format(prefix, image_index))
         saved = cv2.imwrite(filename, image)
         if not saved:
-            rospy.logwarn("[SSS] Impossibile salvare immagine: {}".format(filename))
+            print("[SSS] Impossibile salvare immagine: {}".format(filename))
         return filename
 
     def save_filtered_image(self, image, image_index):
@@ -858,8 +723,20 @@ class ObjectClassificationNode:
     def save_saliency_image(self, saliency_map, image_index):
         return self.save_debug_image( self.saliency_image_folder, "saliency", self.normalize_uint8(saliency_map), image_index)
 
+    def save_bright_saliency_image(self, saliency_map, image_index):
+        return self.save_debug_image(self.saliency_image_folder, "bright_saliency", self.normalize_uint8(saliency_map), image_index)
+
+    def save_dark_saliency_image(self, saliency_map, image_index):
+        return self.save_debug_image(self.saliency_image_folder, "dark_saliency", self.normalize_uint8(saliency_map), image_index)
+
     def save_saliency_binary_image(self, saliency_binary_map, image_index):
         return self.save_debug_image(self.saliency_binary_image_folder, "saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
+
+    def save_bright_saliency_binary_image(self, saliency_binary_map, image_index):
+        return self.save_debug_image(self.saliency_binary_image_folder, "bright_saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
+
+    def save_dark_saliency_binary_image(self, saliency_binary_map, image_index):
+        return self.save_debug_image(self.saliency_binary_image_folder, "dark_saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
 
     def save_bright_map_image(self, bright_map, image_index):
         return self.save_debug_image( self.bright_map_folder, "bright", self.normalize_uint8(bright_map), image_index)
@@ -908,18 +785,14 @@ class ObjectClassificationNode:
                 text_file.write("gaussian_sigma: {:.3f}\n".format(self.gaussian_sigma))
                 text_file.write("clahe_clip_limit: {:.3f}\n".format(self.clahe_clip_limit))
                 text_file.write("clahe_tile_grid_size: {}\n".format(self.clahe_tile_grid_size))
-                text_file.write("percentile_low: {:.3f}\n".format(self.percentile_low))
-                text_file.write("percentile_high: {:.3f}\n".format(self.percentile_high))
                 text_file.write("bright_morph_first_open_kernel_size: {}\n".format(self.bright_morph_first_open_kernel_size))
-                text_file.write("bright_morph_close_kernel_size: {}\n".format(self.bright_morph_close_kernel_size))
+                text_file.write("bright_morph_first_close_kernel_size: {}\n".format(self.bright_morph_first_close_kernel_size))
                 text_file.write("bright_morph_final_open_kernel_size: {}\n".format(self.bright_morph_final_open_kernel_size))
                 text_file.write("bright_morph_final_close_kernel_size: {}\n".format(self.bright_morph_final_close_kernel_size))
                 text_file.write("bright_morph_iterations: {}\n".format(self.bright_morph_iterations))
-                text_file.write("dark_morph_open_kernel_size: {}\n".format(self.dark_morph_open_kernel_size))
+                text_file.write("dark_morph_first_open_kernel_size: {}\n".format(self.dark_morph_first_open_kernel_size))
                 text_file.write("dark_morph_first_close_kernel_width: {}\n".format(self.dark_morph_first_close_kernel_width))
                 text_file.write("dark_morph_first_close_kernel_height: {}\n".format(self.dark_morph_first_close_kernel_height))
-                text_file.write("dark_morph_final_close_kernel_width: {}\n".format(self.dark_morph_final_close_kernel_width))
-                text_file.write("dark_morph_final_close_kernel_height: {}\n".format(self.dark_morph_final_close_kernel_height))
                 text_file.write("dark_morph_iterations: {}\n".format(self.dark_morph_iterations))
                 text_file.write("saliency_percentile: {:.3f}\n".format(self.saliency_percentile))
                 text_file.write("cfar_train_cells: {}\n".format(self.cfar_train_cells))
@@ -927,8 +800,6 @@ class ObjectClassificationNode:
                 text_file.write("cfar_rank_percentile: {:.3f}\n".format(self.cfar_rank_percentile))
                 text_file.write("cfar_threshold_scale: {:.3f}\n".format(self.cfar_threshold_scale))
                 text_file.write("cfar_threshold_offset: {:.3f}\n".format(self.cfar_threshold_offset))
-                text_file.write("cfar_detect_dark: {}\n".format(self.cfar_detect_dark))
-                text_file.write("cfar_pfa: {:.6f}\n".format(self.cfar_pfa))
                 text_file.write("bright_percentile: {:.3f}\n".format(self.bright_percentile))
                 text_file.write("dark_percentile: {:.3f}\n".format(self.dark_percentile))
                 text_file.write("sonar_range_m: {:.3f}\n".format(self.sonar_range_m))
@@ -945,7 +816,6 @@ class ObjectClassificationNode:
                 text_file.write("min_shadow_area_px: {}\n".format(self.min_shadow_area_px))
                 text_file.write("max_shadow_alongtrack_gap_m: {:.3f}\n".format(self.max_shadow_alongtrack_gap_m))
                 text_file.write("max_shadow_accrosstrack_gap_m: {:.3f}\n".format(self.max_shadow_acrosstrack_gap_m))
-                text_file.write("shadow_height_scale: {:.3f}\n".format(self.shadow_height_scale))
                 text_file.write("min_classification_confidence: {:.3f}\n".format(self.min_classification_confidence))
 
                 if len(classifications) == 0:
@@ -962,7 +832,6 @@ class ObjectClassificationNode:
                     text_file.write("tube_score: {:.3f}\n".format(detection['tube_score']))
                     text_file.write("buoy_score: {:.3f}\n".format(detection['buoy_score']))
                     text_file.write("pair_score: {:.3f}\n".format(detection['pair_score']))
-                    text_file.write("estimated_height_m: {:.3f}\n".format(detection['estimated_height_m']))
 
                     text_file.write("object_id: {}\n".format(obj['id']))
                     text_file.write("object_centroid_px: [{:.2f}, {:.2f}]\n".format(obj['centroid_px'][0], obj['centroid_px'][1]))
@@ -984,7 +853,7 @@ class ObjectClassificationNode:
                     text_file.write("shadow_area_m2: {:.3f}\n".format(shadow['area_m2']))
                     text_file.write("shadow_angle_deg: {:.3f}\n".format(shadow['angle_deg']))
         except IOError as exc:
-            rospy.logwarn("[SSS] Impossibile salvare report classificazione: {} ({})".format(filename, exc))
+            print("[SSS] Impossibile salvare report classificazione: {} ({})".format(filename, exc))
 
         return filename
 

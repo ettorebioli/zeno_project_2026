@@ -490,8 +490,8 @@ class GeolocalizationNode:
 	# matrice di rotazione body -> NED (yaw)
 	#x_body, y_body, z_body = body_position
 
-        north = math.cos(yaw) * x_body + math.sin(yaw) * y_body		# segni!! (-)
-        east  = math.sin(yaw) * x_body - math.cos(yaw) * y_body		# segni!! (+)
+        north = math.cos(yaw) * x_body - math.sin(yaw) * y_body		# segni!! (-)
+        east  = math.sin(yaw) * x_body + math.cos(yaw) * y_body		# segni!! (+)
         down  = z_body
 
         return north, east, down

@@ -79,7 +79,8 @@ class WaterfallCreatorNode:
         ]
 
         for folder in folders_to_create:
-            self.ensure_folder(folder)
+            if not os.path.exists(folder):
+                os.makedirs(folder)
 
         # salvataggio plot al termine dell'esecuzione
         rospy.on_shutdown(self.save_echo_intensity_plots)
@@ -137,6 +138,7 @@ class WaterfallCreatorNode:
         self.save_raw_image(raw_image)
         self.save_image(image)
         self.publish_image(image, image_metadata)
+        
         self.image_index += 1
         self.last_image_ping_index = self.ping_index
         
@@ -163,10 +165,6 @@ class WaterfallCreatorNode:
     # ========================================================
     # UTILITIES
     # ========================================================
-    def ensure_folder(self, folder):
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-
     def normalize_to_mono8(self, image):
         image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
         return image.astype(np.uint8)
@@ -365,13 +363,9 @@ class WaterfallCreatorNode:
 
         # pubblicare immagine e metadata sul topic waterfall_image_topic
         self.pub_img.publish(metadata_msg)
-        rospy.loginfo("[SSS] waterfall_image_topic: pubblicata immagine {:03d} con {} ping".format(
-            self.image_index,
-            len(metadata_msg.ping_indices)
-        ))
+        print("[SSS] waterfall_image_topic: pubblicata immagine {:03d} con {} ping".format(self.image_index, len(metadata_msg.ping_indices)))
 
    
-
 # ________________________________________________________________________________________________________________________________
 
     # ========================================================
