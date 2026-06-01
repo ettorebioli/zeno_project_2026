@@ -30,7 +30,7 @@ bridge = None
 # CONFIGURAZIONE TRACKING E CONFIDENZA
 # ============================================================
 TRACK_MATCH_DIST = 100.0  # Distanza massima in pixel per associare un target tra due frame
-TRACK_HISTORY_LEN = 10    # Finestra di memoria (es. gli ultimi 10 frame)
+TRACK_HISTORY_LEN = 20    # Finestra di memoria (es. gli ultimi 10 frame)
 MAX_LOST_FRAMES = 5       # Quanti frame un target può "sparire" prima di essere dimenticato
 
 tracks = []
@@ -82,15 +82,15 @@ def compute_base_pipeline(img):
     Pipeline base essenziale per l'isolamento dei target.
     """
     # 1. Filtro Mediano più aggressivo (da 3 a 5)
-    # median = cv2.medianBlur(img, 5) 
+    # median = cv2.medianBlur(img, 5)
 
-    median = cv2.GaussianBlur(img, (5, 5), 0)
+    median = cv2.GaussianBlur(img, (3, 3), 0)
 
     background = cv2.GaussianBlur(median, (101, 101), 0)
 
     bright = cv2.absdiff(median, background)
 
-    _, binary = cv2.threshold(bright, 60, 255, cv2.THRESH_BINARY)
+    _, binary = cv2.threshold(bright, 45, 255, cv2.THRESH_BINARY)
 
     # 3. Nuova sequenza morfologica
     # Prima OPEN: Elimina il rumore isolato (i puntini)
@@ -98,8 +98,15 @@ def compute_base_pipeline(img):
     binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel_open)
 
     # Poi CLOSE: Ricompatta le forme dei target e unisce i frammenti vicini
-    kernel_close = np.ones((27, 27), np.uint8)
+    kernel_close = np.ones((9, 9), np.uint8)
     binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_close)
+
+    # kernel_open = np.ones((9, 9), np.uint8)
+    # binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel_open)
+
+    # # Poi CLOSE: Ricompatta le forme dei target e unisce i frammenti vicini
+    # kernel_close = np.ones((11, 11), np.uint8)
+    # binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_close)
 
     return bright, binary
 
@@ -144,8 +151,8 @@ def extract_and_merge_targets(binary_img):
     used = [False] * len(raw_detections)
     
     # Soglie di distanza in pixel per considerare due frammenti come uniti
-    MERGE_DX = 90 
-    MERGE_DY = 150
+    MERGE_DX = 70 
+    MERGE_DY = 70
 
     # 2. Clustering (Raggruppamento a catena)
     for i in range(len(raw_detections)):
@@ -235,7 +242,7 @@ def classify_target(w, h, area, parts):
     # REGOLE TUBO: La precondizione fondamentale è che deve essere "grande"
     is_tubo = (
         150 <= area <= 3000 and 
-        aspect >= 3.0  
+        2.0 <= aspect <= 4.0  
         # (
         #     max_side >= 80 
         # )
@@ -244,7 +251,7 @@ def classify_target(w, h, area, parts):
     is_boa = (
 
         30 <= area <= 145 and
-        aspect <= 1.5
+        aspect <= 1.8
     )
 
     if is_tubo:
@@ -390,6 +397,10 @@ def fls_callback(msg):
             color = (255, 0, 0)
 
         cv2.drawContours(out_img, [rotated_box], 0, color, 2)
+
+        # debug box dritte, si può togliere in seguito
+        # NUOVO: Disegna la Straight Box in GIALLO per fare debug
+        cv2.rectangle(out_img, (int(x), int(y)), (int(x+w), int(y+h)), (0, 255, 255), 1)
         
         top_y = min([pt[1] for pt in rotated_box])
         left_x = min([pt[0] for pt in rotated_box])
