@@ -81,14 +81,25 @@ class FLSLocalizationNode:
         """Salva la mappa su file JSON e fa un'ultima pubblicazione sul topic prima di morire."""
         rospy.loginfo("Generazione della mappa finale in: {}".format(self.final_map_path))
         try:
+            # --- MODIFICA: Filtriamo la mappa prima di scriverla nel JSON ---
+            MIN_OBS_COUNT = 35 # Consiglio di tenerlo a 35 per non perdere i target veri!
+            confirmed_targets = {}
+            
+            for t_id, t_data in self.global_targets.items():
+                if t_data['obs_count'] >= MIN_OBS_COUNT:
+                    confirmed_targets[t_id] = t_data
+
             with open(self.final_map_path, 'w') as f:
-                json.dump(self.global_targets, f, indent=4)
-            rospy.loginfo("Mappa salvata con successo! Trovati {} target unici.".format(len(self.global_targets)))
+                # Ora salviamo solo il dizionario pulito!
+                json.dump(confirmed_targets, f, indent=4)
+                
+            rospy.loginfo("Mappa salvata con successo! Trovati {} target confermati.".format(len(confirmed_targets)))
             
             # Un'ultima pubblicazione di sicurezza sul topic prima di chiudere
             map_msg = String()
-            map_msg.data = json.dumps(self.global_targets)
+            map_msg.data = json.dumps(confirmed_targets)
             self.pub_global_map.publish(map_msg)
+            
         except Exception as e:
             rospy.logerr("Errore nel salvataggio: {}".format(e))
 
@@ -262,11 +273,37 @@ class FLSLocalizationNode:
                     min_dist = dist
                     best_global_id = gid
 
+            # if best_global_id is not None:
+            #     g_tgt = self.global_targets[best_global_id]
+            #     # --- MODIFICA: Filtro Esponenziale (EMA) ---
+            #     # ALPHA = 0.2 significa: la nuova misura pesa il 20%, la vecchia storia l'80%
+            #     # Il baricentro sarà fluido ma non resterà "bloccato" da 1000 frame vecchi sballati.
+            #     ALPHA = 0.2 
+    
+            #     g_tgt['lat'] = (1 - ALPHA) * g_tgt['lat'] + ALPHA * raw_lat
+            #     g_tgt['lon'] = (1 - ALPHA) * g_tgt['lon'] + ALPHA * raw_lon
+    
+            #     g_tgt['obs_count'] += 1
+                
+            #     # Se lo vediamo da più vicino, aggiorniamo la classe in cui crediamo
+            #     if current_range < g_tgt['min_range']:
+            #         g_tgt['type'] = raw_type
+            #         g_tgt['confidence'] = raw_conf
+            #         g_tgt['min_range'] = current_range
+            # else:
+            #     best_global_id = self.next_global_id
+            #     self.next_global_id += 1
+            #     self.global_targets[best_global_id] = {
+            #         'lat': raw_lat,
+            #         'lon': raw_lon,
+            #         'type': raw_type,
+            #         'confidence': raw_conf,
+            #         'min_range': current_range,
+            #         'obs_count': 1
+            #     }
+                    
             if best_global_id is not None:
                 g_tgt = self.global_targets[best_global_id]
-                # --- MODIFICA: Filtro Esponenziale (EMA) ---
-                # ALPHA = 0.2 significa: la nuova misura pesa il 20%, la vecchia storia l'80%
-                # Il baricentro sarà fluido ma non resterà "bloccato" da 1000 frame vecchi sballati.
                 ALPHA = 0.2 
     
                 g_tgt['lat'] = (1 - ALPHA) * g_tgt['lat'] + ALPHA * raw_lat
@@ -274,11 +311,19 @@ class FLSLocalizationNode:
     
                 g_tgt['obs_count'] += 1
                 
-                # Se lo vediamo da più vicino, aggiorniamo la classe in cui crediamo
-                if current_range < g_tgt['min_range']:
-                    g_tgt['type'] = raw_type
-                    g_tgt['confidence'] = raw_conf
-                    g_tgt['min_range'] = current_range
+                # --- NUOVA LOGICA: VOTAZIONE DELLA CLASSE ---
+                # Aggiungiamo i voti pesati sulla confidenza
+                if raw_type in g_tgt['type_votes']:
+                    g_tgt['type_votes'][raw_type] += float(raw_conf)
+                else:
+                    g_tgt['type_votes'][raw_type] = float(raw_conf)
+                    
+                # La classe definitiva è quella che ha accumulato più punti
+                g_tgt['type'] = max(g_tgt['type_votes'], key=g_tgt['type_votes'].get)
+                
+                # La confidenza finale diventa una media ponderata
+                g_tgt['confidence'] = round(g_tgt['type_votes'][g_tgt['type']] / g_tgt['obs_count'], 3)
+                
             else:
                 best_global_id = self.next_global_id
                 self.next_global_id += 1
@@ -287,8 +332,8 @@ class FLSLocalizationNode:
                     'lon': raw_lon,
                     'type': raw_type,
                     'confidence': raw_conf,
-                    'min_range': current_range,
-                    'obs_count': 1
+                    'obs_count': 1,
+                    'type_votes': {raw_type: float(raw_conf)} # <- Inizializziamo il dizionario dei voti
                 }
 
             # 1. Pubblichiamo il target singolo aggiornato (come prima)
@@ -301,9 +346,17 @@ class FLSLocalizationNode:
             out_msg.data = json.dumps(target_data)
             self.pub_localized.publish(out_msg)
 
+            # ---> NUOVA LOGICA: TRACK CONFIRMATION <---
+            MIN_OBS_COUNT = 35
+            confirmed_targets = {}
+            
+            for t_id, t_data in self.global_targets.items():
+                if t_data['obs_count'] >= MIN_OBS_COUNT:
+                    confirmed_targets[t_id] = t_data
+
             # 2. PUBBLICHIAMO L'INTERA MAPPA GLOBALE (Il dizionario pulito!)
             map_msg = String()
-            map_msg.data = json.dumps(self.global_targets)
+            map_msg.data = json.dumps(confirmed_targets)
             self.pub_global_map.publish(map_msg)
 
             # Salvataggio log continuo (nella Home)

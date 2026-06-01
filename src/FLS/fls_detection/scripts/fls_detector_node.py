@@ -90,7 +90,7 @@ def compute_base_pipeline(img):
 
     bright = cv2.absdiff(median, background)
 
-    _, binary = cv2.threshold(bright, 50, 255, cv2.THRESH_BINARY)
+    _, binary = cv2.threshold(bright, 45, 255, cv2.THRESH_BINARY)
 
     # 3. Nuova sequenza morfologica
     # Prima OPEN: Elimina il rumore isolato (i puntini)
@@ -101,7 +101,7 @@ def compute_base_pipeline(img):
     kernel_close = np.ones((9, 9), np.uint8)
     binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_close)
 
-    # kernel_open = np.ones((2, 2), np.uint8)
+    # kernel_open = np.ones((9, 9), np.uint8)
     # binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel_open)
 
     # # Poi CLOSE: Ricompatta le forme dei target e unisce i frammenti vicini
@@ -242,7 +242,7 @@ def classify_target(w, h, area, parts):
     # REGOLE TUBO: La precondizione fondamentale è che deve essere "grande"
     is_tubo = (
         150 <= area <= 3000 and 
-        aspect >= 3.0  
+        2.0 <= aspect <= 4.0  
         # (
         #     max_side >= 80 
         # )
@@ -251,7 +251,7 @@ def classify_target(w, h, area, parts):
     is_boa = (
 
         30 <= area <= 145 and
-        aspect <= 1.5
+        aspect <= 1.8
     )
 
     if is_tubo:
