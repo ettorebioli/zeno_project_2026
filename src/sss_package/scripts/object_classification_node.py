@@ -190,18 +190,19 @@ class ObjectClassificationNode:
 
         # 10. salvataggio risultati
         image_index = self.image_index
-        self.save_filtered_image(image, image_index)
-        self.save_bright_saliency_image(bright_saliency_map, image_index)
-        self.save_dark_saliency_image(dark_saliency_map, image_index)
-        self.save_bright_saliency_binary_image(bright_saliency_binary_map, image_index)
-        #self.save_dark_saliency_binary_image(dark_saliency_binary_map, image_index)
-        self.save_bright_map_image(bright_map, image_index)
-        self.save_dark_map_image(dark_map, image_index)
-        self.save_bright_and_salient_map_image(bright_and_salient_map, image_index)
-        #self.save_dark_and_salient_map_image(dark_and_salient_map, image_index)
-        self.save_bright_and_salient_morph_map_image(bright_and_salient_morph_map, image_index)
-        #self.save_dark_and_salient_morph_map_image(dark_and_salient_morph_map, image_index)
-        self.save_dark_morph_map_image(dark_morph_map, image_index)
+        self.save_debug_image(self.filtered_image_folder, "filtered", image, image_index)
+        self.save_debug_image(self.bright_saliency_image_folder, "bright_saliency", bright_saliency_map, image_index)
+        self.save_debug_image(self.dark_saliency_image_folder, "dark_saliency", dark_saliency_map, image_index)
+        self.save_debug_image(self.bright_saliency_binary_image_folder, "bright_saliency_binary", bright_saliency_binary_map, image_index)
+        #self.save_debug_image(self.dark_saliency_binary_image_folder, "dark_saliency_binary", dark_saliency_binary_map, image_index)
+        self.save_debug_image(self.bright_map_folder, "bright", bright_map, image_index)
+        self.save_debug_image(self.dark_map_folder, "dark", dark_map, image_index)
+        self.save_debug_image(self.bright_and_salient_map_folder, "bright_and_salient", bright_and_salient_map, image_index)
+        #self.save_debug_image(self.dark_and_salient_map_folder, "dark_and_salient", dark_and_salient_map, image_index)
+        self.save_debug_image(self.bright_morph_image_folder, "bright_and_salient_morph", bright_and_salient_morph_map, image_index)
+        #self.save_debug_image(self.dark_morph_image_folder, "dark_and_salient_morph", dark_and_salient_morph_map, image_index)
+        self.save_debug_image(self.dark_morph_image_folder, "dark_morph", dark_morph_map, image_index)
+        self.add_turning_status_to_classifications(msg, classifications)
         self.save_classification_image(image, classifications, image_index)
         self.save_classification_text(classifications, image_index)
 
@@ -222,6 +223,8 @@ class ObjectClassificationNode:
         detected_msg.ping_stamps = source_msg.ping_stamps
         detected_msg.nav_statuses = source_msg.nav_statuses
         detected_msg.altitudes = source_msg.altitudes
+        detected_msg.sss_states = source_msg.sss_states
+        detected_msg.turning_statuses = source_msg.turning_statuses
 
         detected_msg.object_classes = []
         detected_msg.object_confidences = []
@@ -252,6 +255,15 @@ class ObjectClassificationNode:
     # ========================================================
     # UTILITIES
     # ========================================================
+
+    def add_turning_status_to_classifications(self, source_msg, classifications):
+        for detection in classifications:
+            # la coordinata y del centroide identifica la riga/ping della detection
+            row = int(round(detection['object']['centroid_px'][1]))
+            row = max(0, min(row, len(source_msg.ping_indices) - 1))
+
+            detection['sss_state'] = source_msg.sss_states[row]
+            detection['isturning'] = bool(source_msg.turning_statuses[row])
 
     def make_positive_odd(self, value):
         value = int(value)
@@ -301,7 +313,7 @@ class ObjectClassificationNode:
 
     def apply_clahe_filter(self, image):
         tile_grid_size = self.make_positive_odd(self.clahe_tile_grid_size)
-	clahe = cv2.createCLAHE(clipLimit = self.clahe_clip_limit, tileGridSize = (tile_grid_size, tile_grid_size))
+        clahe = cv2.createCLAHE(clipLimit = self.clahe_clip_limit, tileGridSize = (tile_grid_size, tile_grid_size))
         return clahe.apply(self.normalize_uint8(image))
 
 
@@ -573,99 +585,8 @@ class ObjectClassificationNode:
             })
         return blobs
 
-
-    def is_shadow_candidate_for_object(self, obj, shadow, nadir_column):
-        # leggere i centroidi in pixel di oggetto e ombra
-        obj_x, obj_y       = obj['centroid']
-        shadow_x, shadow_y = shadow['centroid']
-
-        # distanza across-track (dal nadir)
-        obj_range    = abs(obj_x - nadir_column)
-        shadow_range = abs(shadow_x - nadir_column)
-
-        # 1) ombra deve essere piu' lontana dal nadir rispetto all'oggetto
-        if shadow_range <= obj_range:
-            return False
-
-        # 2) oggetto e ombra devono stare dallo stesso lato del nadir
-        if (obj_x - nadir_column) * (shadow_x - nadir_column) < 0.0:
-            return False
-
-        # distanza tra oggetto e ombra in metri
-        alongtrack_gap_m  = abs(shadow_y - obj_y) * self.meters_per_pixel_y
-        acrosstrack_gap_m = (shadow_range - obj_range) * self.meters_per_pixel_x
-
-        # 3) scartare coppie troppo lontane per essere un oggetto e la sua ombra
-        if alongtrack_gap_m > self.max_shadow_alongtrack_gap_m:
-            return False
-        if acrosstrack_gap_m > self.max_shadow_acrosstrack_gap_m:
-            return False
-
-        return True
-
-    def pair_score(self, obj, shadow, nadir_column):
-        # calcolare posizione relativa di oggetto e ombra rispetto al nadir
-        obj_x, obj_y       = obj['centroid']
-        shadow_x, shadow_y = shadow['centroid']
-        obj_range          = abs(obj_x - nadir_column)
-        shadow_range       = abs(shadow_x - nadir_column)
-
-        # distanze in metri usate per stimare la qualita della coppia
-        acrosstrack_gap_m = max(0.0, (shadow_range - obj_range) * self.meters_per_pixel_x)
-        alongtrack_gap_m  = abs(shadow_y - obj_y) * self.meters_per_pixel_y
-
-        # punteggio semplice: 1 punto per ogni condizione buona della coppia oggetto-ombra
-        score = 0.0
-        if alongtrack_gap_m <= 0.5 * self.max_shadow_alongtrack_gap_m:
-            score += 1.0
-        if acrosstrack_gap_m <= 0.5 * self.max_shadow_acrosstrack_gap_m:
-            score += 1.0
-        return score
-
-    def choose_best_shadow(self, obj, shadows, nadir_column):
-        # cercare ombra con punteggio migliore per l'oggetto
-        best_shadow = None
-        best_score = -1.0
-        for shadow in shadows:
-            # prima applicare i vincoli geometrici minimi
-            if not self.is_shadow_candidate_for_object(obj, shadow, nadir_column):
-                continue
-
-            # poi calcolare un punteggio per confrontare le ombre candidate
-            score = self.pair_score(obj, shadow, nadir_column)
-            if score > best_score:
-                best_score = score
-                best_shadow = shadow
-        return best_shadow, best_score
-
-    def score_interval(self, value, min_value, max_value):
-        # restituire 1 punto se il valore cade dentro l'intervallo, altrimenti 0
-        if min_value <= value <= max_value:
-            return 1.0
-        return 0.0
-
-    def score_tube(self, obj, shadow, pair_score):
-        # tubo atteso e' lungo, stretto e con ombra coerente con un oggetto allungato
-        shadow_ratio = shadow['max_dimension_m'] / max(obj['max_dimension_m'], 0.001)
-        score = pair_score
-        score += self.score_interval(obj['max_dimension_m'], 2.0, 4.0)			# intervallo di dimensioni massime dell oggetto ammissibili
-        score += self.score_interval(obj['min_dimension_m'], 0.4, 1.1)			# intervallo di dimensioni minime  dell oggetto ammissibili
-        score += self.score_interval(obj['aspect_ratio'], 2.0, 10.0)			# dimensioni bbox descrivono la forma del blob (max_dimension_m / min_dimension_m)
-        score += self.score_interval(shadow_ratio, 0.8, 4.0)					# rapporto ombra/oggetto per verificare che ombra non sia troppo piccola rispetto all oggetto
-        return score
-
-    def score_buoy(self, obj, shadow, pair_score):
-        # boa attesa e' piu' compatta e ombra abbastanza lunga rispetto all oggetto
-        shadow_ratio = shadow['max_dimension_m'] / max(obj['max_dimension_m'], 0.001)
-        score = pair_score
-        score += self.score_interval(obj['max_dimension_m'], 0.3, 1.6)			# intervallo di dimensioni massime dell oggetto ammissibili
-        score += self.score_interval(obj['min_dimension_m'], 0.3, 1.2)			# intervallo di dimensioni minime  dell oggetto ammissibili
-        score += self.score_interval(obj['aspect_ratio'], 1.0, 2.0)				# dimensioni bbox descrivono la forma del blob (max_dimension_m / min_dimension_m)
-        score += self.score_interval(shadow_ratio, 1.0, 5.0)					# rapporto ombra/oggetto per verificare che ombra non sia troppo piccola rispetto all oggetto
-        return score
-
     def detect_and_classify_objects(self, bright_map, dark_map):
-        # ricavare larghezza immagine e assumere il nadir al centro dell'immagine sonar
+        # ricavare larghezza immagine e assumere il nadir al centro
         image_width  = bright_map.shape[1]
         nadir_column = image_width / 2.0
 
@@ -676,13 +597,74 @@ class ObjectClassificationNode:
         detections = []
         for obj in objects:
             # associare all'oggetto l'ombra piu' plausibile
-            shadow, pair_score = self.choose_best_shadow(obj, shadows, nadir_column)
+            best_shadow = None
+            best_pair_score = -1.0
+
+            for candidate_shadow in shadows:
+                # leggere i centroidi in pixel di oggetto e ombra
+                obj_x, obj_y       = obj['centroid']
+                shadow_x, shadow_y = candidate_shadow['centroid']
+
+                # distanza across-track dal nadir
+                obj_range    = abs(obj_x - nadir_column)
+                shadow_range = abs(shadow_x - nadir_column)
+
+                # scartare ombra se non e' piu' lontana dal nadir e se non e' sullo stesso lato dell'oggetto
+                if shadow_range <= obj_range:
+                    continue
+                if (obj_x - nadir_column) * (shadow_x - nadir_column) < 0.0:
+                    continue
+
+                # distanza tra oggetto e ombra in metri
+                alongtrack_gap_m  = abs(shadow_y - obj_y) * self.meters_per_pixel_y
+                acrosstrack_gap_m = (shadow_range - obj_range) * self.meters_per_pixel_x
+
+                # scartare coppie troppo lontane per essere un oggetto e la sua ombra
+                if alongtrack_gap_m > self.max_shadow_alongtrack_gap_m:
+                    continue
+                if acrosstrack_gap_m > self.max_shadow_acrosstrack_gap_m:
+                    continue
+
+                # punteggio: 1 punto per ogni condizione buona della coppia oggetto-ombra
+                pair_score = 0.0
+                if alongtrack_gap_m <= 0.5 * self.max_shadow_alongtrack_gap_m:
+                    pair_score += 1.0
+                if max(0.0, acrosstrack_gap_m) <= 0.5 * self.max_shadow_acrosstrack_gap_m:
+                    pair_score += 1.0
+
+                if pair_score > best_pair_score:
+                    best_pair_score = pair_score
+                    best_shadow = candidate_shadow
+
+            shadow = best_shadow
+            pair_score = best_pair_score
             if shadow is None:
                 continue
 
-            # calcolare punteggi separati per tubo e boa
-            tube_score = self.score_tube(obj, shadow, pair_score)
-            buoy_score = self.score_buoy(obj, shadow, pair_score)
+            shadow_ratio = shadow['max_dimension_m'] / max(obj['max_dimension_m'], 0.001)
+            #aspect_ratio : max_dimension_m / min_dimension_m
+
+            # tubo atteso: lungo, stretto e con ombra coerente con un oggetto allungato
+            tube_score = pair_score
+            if 2.0 <= obj['max_dimension_m'] <= 4.0:
+                tube_score += 1.0
+            if 0.4 <= obj['min_dimension_m'] <= 1.1:
+                tube_score += 1.0
+            if 2.0 <= obj['aspect_ratio'] <= 10.0:
+                tube_score += 1.0
+            if 0.8 <= shadow_ratio <= 4.0:
+                tube_score += 1.0
+
+            # boa attesa: piu' compatta e con ombra abbastanza lunga rispetto all'oggetto
+            buoy_score = pair_score
+            if 0.3 <= obj['max_dimension_m'] <= 1.9: #2.7
+                buoy_score += 1.0
+            if 0.3 <= obj['min_dimension_m'] <= 1.2:
+                buoy_score += 1.0
+            if 1.0 <= obj['aspect_ratio'] <= 2.0:   #2.467 3.6 2.796
+                buoy_score += 1.0
+            if 1.0 <= shadow_ratio <= 5.0:
+                buoy_score += 1.0
 
             # usare il punteggio migliore come base per la confidenza finale
             max_score = max(tube_score, buoy_score)
@@ -747,52 +729,10 @@ class ObjectClassificationNode:
 
     def save_debug_image(self, folder, prefix, image, image_index):
         filename = os.path.join(folder, "{}_{:03d}.png".format(prefix, image_index))
-        saved = cv2.imwrite(filename, image)
+        saved = cv2.imwrite(filename, self.normalize_uint8(image))
         if not saved:
             print("[SSS] Impossibile salvare immagine: {}".format(filename))
         return filename
-
-    def save_filtered_image(self, image, image_index):
-        return self.save_debug_image(self.filtered_image_folder, "filtered", self.normalize_uint8(image), image_index)
-
-    def save_saliency_image(self, saliency_map, image_index):
-        return self.save_debug_image( self.saliency_image_folder, "saliency", self.normalize_uint8(saliency_map), image_index)
-
-    def save_bright_saliency_image(self, saliency_map, image_index):
-        return self.save_debug_image(self.bright_saliency_image_folder, "bright_saliency", self.normalize_uint8(saliency_map), image_index)
-
-    def save_dark_saliency_image(self, saliency_map, image_index):
-        return self.save_debug_image(self.dark_saliency_image_folder, "dark_saliency", self.normalize_uint8(saliency_map), image_index)
-
-    def save_saliency_binary_image(self, saliency_binary_map, image_index):
-        return self.save_debug_image(self.saliency_binary_image_folder, "saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
-
-    def save_bright_saliency_binary_image(self, saliency_binary_map, image_index):
-        return self.save_debug_image(self.bright_saliency_binary_image_folder, "bright_saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
-
-    def save_dark_saliency_binary_image(self, saliency_binary_map, image_index):
-        return self.save_debug_image(self.dark_saliency_binary_image_folder, "dark_saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
-
-    def save_bright_map_image(self, bright_map, image_index):
-        return self.save_debug_image( self.bright_map_folder, "bright", self.normalize_uint8(bright_map), image_index)
-
-    def save_dark_map_image(self, dark_map, image_index):
-        return self.save_debug_image(self.dark_map_folder, "dark", self.normalize_uint8(dark_map), image_index)
-
-    def save_bright_and_salient_map_image(self, bright_map, image_index):
-        return self.save_debug_image(self.bright_and_salient_map_folder, "bright_and_salient", self.normalize_uint8(bright_map), image_index)
-
-    def save_dark_and_salient_map_image(self, dark_map, image_index):
-        return self.save_debug_image(self.dark_and_salient_map_folder, "dark_and_salient", self.normalize_uint8(dark_map), image_index)
-
-    def save_bright_and_salient_morph_map_image(self, bright_map, image_index):
-        return self.save_debug_image(self.bright_morph_image_folder, "bright_and_salient_morph", self.normalize_uint8(bright_map), image_index)
-
-    #def save_dark_and_salient_morph_map_image(self, dark_map, image_index):
-    #    return self.save_debug_image(self.dark_morph_image_folder, "dark_and_salient_morph", self.normalize_uint8(dark_map), image_index)
-
-    def save_dark_morph_map_image(self, dark_map, image_index):
-        return self.save_debug_image(self.dark_morph_image_folder, "dark_morph", self.normalize_uint8(dark_map), image_index)
 
     def save_classification_image(self, image, classifications, image_index):
         output = cv2.cvtColor(self.normalize_uint8(image), cv2.COLOR_GRAY2BGR)
@@ -876,6 +816,8 @@ class ObjectClassificationNode:
                     text_file.write("tube_score: {:.3f}\n".format(detection['tube_score']))
                     text_file.write("buoy_score: {:.3f}\n".format(detection['buoy_score']))
                     text_file.write("pair_score: {:.3f}\n".format(detection['pair_score']))
+                    text_file.write("sss_state: {}\n".format(detection.get('sss_state', 'UNKNOWN')))
+                    text_file.write("isturning: {}\n".format(str(detection.get('isturning', False)).lower()))
 
                     text_file.write("object_id: {}\n".format(obj['id']))
                     text_file.write("object_centroid_px: [{:.2f}, {:.2f}]\n".format(obj['centroid_px'][0], obj['centroid_px'][1]))

@@ -19,6 +19,7 @@ from marta_msgs.msg import Altitude
 from marta_msgs.msg import NavStatus
 from sss_package.msg import ImageMetadata
 from cv_bridge import CvBridge
+from std_msgs.msg import String
 
 
 # ============================================================
@@ -43,6 +44,7 @@ class WaterfallCreatorNode:
         self.default_altitude = 4.0     # metri
         self.sonar_range = 25.0         # metri
         self.latest_nav = NavStatus()
+        self.latest_sss_state = "UNKNOWN"
 
         # definire parametri waterfall
         self.raw_ping_buffer = []
@@ -89,6 +91,9 @@ class WaterfallCreatorNode:
         rospy.Subscriber('/drivers/sss_sim', SideScanSonar, self.waterfall_callback)
         rospy.Subscriber('/drivers/altitude_sim', Altitude, self.altitude_callback)
         rospy.Subscriber('/nav_status', NavStatus, self.navstatus_callback)
+        rospy.Subscriber('/phase1/SSS', String, self.sss_state_callback)
+        rospy.Subscriber('/phase3/SSS', String, self.sss_state_callback)
+
       
 
 # ________________________________________________________________________________________________________________________________
@@ -158,6 +163,14 @@ class WaterfallCreatorNode:
     def navstatus_callback(self, msg):
         # estrarre stato di navigazione
         self.latest_nav = copy.deepcopy(msg)
+
+
+    # ========================================================
+    # CALLBACK PER STATO SSS / CURVA DI ZENO
+    # ========================================================
+    def sss_state_callback(self, msg):
+        # OFF indica ingresso/uscita curva 
+        self.latest_sss_state = msg.data
         
 
 # ________________________________________________________________________________________________________________________________
@@ -174,6 +187,9 @@ class WaterfallCreatorNode:
         metadata_msg.ping_stamps    = [metadata['ping_stamp'] for metadata in metadata_list]
         metadata_msg.nav_statuses   = [metadata['nav_status'] for metadata in metadata_list]
         metadata_msg.altitudes      = [metadata['altitude'] for metadata in metadata_list]
+        # stato SSS e curva sono allineati riga-per-riga ai ping della waterfall
+        metadata_msg.sss_states     = [metadata['sss_state'] for metadata in metadata_list]
+        metadata_msg.turning_statuses = [metadata['turning_status'] for metadata in metadata_list]
         return metadata_msg
 
 
@@ -278,7 +294,9 @@ class WaterfallCreatorNode:
             'ping_index': int(self.ping_index),
             'ping_stamp': sonar_msg.header.stamp,
             'nav_status': copy.deepcopy(self.latest_nav),
-            'altitude': float(self.altitude) if self.altitude is not None else self.default_altitude
+            'altitude': float(self.altitude) if self.altitude is not None else self.default_altitude,
+            'sss_state': self.latest_sss_state,
+            'turning_status': self.latest_sss_state == "OFF"    # OFF = entrata/uscita da curva
         }
         # aggiungi i nuovi metadata in cima alla lista
         self.ping_metadata_buffer.insert(0, metadata)

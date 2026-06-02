@@ -6,6 +6,8 @@ uint32[] ping_indices
 time[] ping_stamps
 marta_msgs/NavStatus[] nav_statuses
 float32[] altitudes
+string[] sss_states
+bool[] turning_statuses
 
 string[] object_classes
 float32[] object_confidences
