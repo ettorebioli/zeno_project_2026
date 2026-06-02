@@ -8,16 +8,83 @@ import math
 import os
 import rospkg
 import sys
-import csv
 import json
 from collections import OrderedDict
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import rospy
 from std_msgs.msg import String
 from sss_package.msg import ImageMetadata
 from sss_package.msg import GeolocatedObject
-from sss_package.msg import GeolocatedObjectList
 from geodetic_functions import ll2ne 
 from geodetic_functions import ne2ll 
+
+
+# ============================================================
+# DATI MANUALI PER MAPPA FINALE
+# ============================================================
+# Inserire punti come (latitudine, longitudine).
+MANUAL_POLYGON_POINTS = [
+
+    # allenamento_7_10
+    (43.7065117, 10.4750928),
+    (43.7062829, 10.4755984),
+    (43.7063663, 10.4757727),
+    (43.7067269, 10.4754723),
+    (43.7067599, 10.4752309),
+    (43.7065117, 10.4750928)
+]
+
+# inserire oggetti noti del file .csv
+MANUAL_REFERENCE_OBJECTS = [
+    
+    # allenamento_7
+    #{'type': 'boa', 'lat': 43.7065128, 'lon': 10.4752562},
+    #{'type': 'boa', 'lat': 43.7066204, 'lon': 10.4754251},
+    #{'type': 'boa', 'lat': 43.7066514, 'lon': 10.4752405},
+    #{'type': 'boa', 'lat': 43.7064982, 'lon': 10.4754498},
+    #{'type': 'boa', 'lat': 43.7063935, 'lon': 10.4756603},
+    #{'type': 'boa', 'lat': 43.7064003, 'lon': 10.4755168},
+    #{'type': 'tubo', 'lat': 43.706569, 'lon': 10.4753291},
+    #{'type': 'tubo', 'lat': 43.7064866, 'lon': 10.4755785},
+    #{'type': 'tubo', 'lat': 43.7064439, 'lon': 10.4753747},
+    #{'type': 'tubo', 'lat': 43.7066902, 'lon': 10.4753438},
+    #{'type': 'tubo', 'lat': 43.706347, 'lon': 10.4755799},
+    #{'type': 'tubo', 'lat': 43.706568, 'lon': 10.4755034},
+    #{'type': 'tubo', 'lat': 43.7065293, 'lon': 10.4751467}
+
+    # allenamento_10
+    {'type': 'boa', 'lat': 43.7065128, 'lon': 10.4752562},
+    {'type': 'boa', 'lat': 43.7066204, 'lon': 10.4754251},
+    {'type': 'boa', 'lat': 43.7066514, 'lon': 10.4752405},
+    {'type': 'boa', 'lat': 43.7064982, 'lon': 10.4754498},
+    {'type': 'boa', 'lat': 43.7063935, 'lon': 10.4756603},
+    {'type': 'boa', 'lat': 43.7064003, 'lon': 10.4755168},
+    {'type': 'tubo', 'lat': 43.7065690, 'lon': 10.4753291},
+    {'type': 'tubo', 'lat': 43.7064866, 'lon': 10.4755785},
+    {'type': 'tubo', 'lat': 43.7064439, 'lon': 10.4753747},
+    {'type': 'tubo', 'lat': 43.7066902, 'lon': 10.4753438},
+    {'type': 'tubo', 'lat': 43.7063470, 'lon': 10.4755799},
+    {'type': 'tubo', 'lat': 43.7065680, 'lon': 10.4755034},
+    {'type': 'tubo', 'lat': 43.7065293, 'lon': 10.4751467}
+
+    # allenamento_11
+    #{'type': 'boa', 'lat': 43.7065521, 'lon': 10.475344},
+    #{'type': 'boa', 'lat': 43.7065487, 'lon': 10.4754861},
+    #{'type': 'boa', 'lat': 43.7066092, 'lon': 10.4752251},
+    #{'type': 'boa', 'lat': 43.7064783, 'lon': 10.4753157},
+    #{'type': 'boa', 'lat': 43.7063935, 'lon': 10.4756603},
+    #{'type': 'boa', 'lat': 43.7064081, 'lon': 10.4755443},
+    #{'type': 'tubo', 'lat': 43.7065302, 'lon': 10.4752044},
+    #{'type': 'tubo', 'lat': 43.7064376, 'lon': 10.4754303},
+    #{'type': 'tubo', 'lat': 43.7066194, 'lon': 10.4753593},
+    #{'type': 'tubo', 'lat': 43.7066902, 'lon': 10.4753438},
+    #{'type': 'tubo', 'lat': 43.7063213, 'lon': 10.4755879},
+    #{'type': 'tubo', 'lat': 43.7064875, 'lon': 10.4755269},
+    #{'type': 'tubo', 'lat': 43.7066209, 'lon': 10.4754706},
+
+]
 
 
 # ============================================================
@@ -27,15 +94,11 @@ class GeolocalizationNode:
 
     def __init__(self):
 
-	print("geolocalization_node.py initialization\n")
+	print("[SSS] geolocalization_node.py initialization\n")
 
         # inizializzare subscriber/publisher
         rospy.Subscriber('/classified_objects_topic', ImageMetadata, self.classified_objects_callback)
         self.pub_object_list = rospy.Publisher('list_topic', String, queue_size=20)
-
-        # funzioni geodetiche fornite
-        #geodetic_path = rospy.get_param('~geodetic_functions_path', '/home/student/Downloads')
-        #self.ne2ll = self.load_ne2ll_function(geodetic_path)
 
         # definire parametri Zeno e sensore
         self.sonar_range_m     = float(rospy.get_param('~sonar_range_m', 25.0))
@@ -43,37 +106,22 @@ class GeolocalizationNode:
         self.sensor_y_offset_m = float(rospy.get_param('~sensor_y_offset_m', 0.354))
         self.sensor_z_offset_m = float(rospy.get_param('~sensor_z_offset_m', 0.096))
         self.object_match_distance_m = float(rospy.get_param('~object_match_distance_m', 3.0))
+        self.final_map_filename = rospy.get_param('~final_map_filename', 'final_detection_map.png')
 
-        
-
-        # Ottieni il percorso base del pacchetto
+        # creazione cartelle per i risultati
         rospack = rospkg.RosPack()
         pkg_path = rospack.get_path('sss_package') 
-
-        # Costruisci il percorso di default dinamico
         default_folder = os.path.join(pkg_path, 'results', '9_list_texts')
-
-        # Leggi il parametro (se non fornito, usa il default dinamico che hai appena creato)
         self.list_text_folder = rospy.get_param('~list_text_folder', default_folder)
-
-        # Crea le cartelle se non esistono
         if not os.path.exists(self.list_text_folder):
             os.makedirs(self.list_text_folder)
 
+        # definire parametri oggetti
         self.list_text_index = 0
         self.object_list = []
         self.complete_object_list = []
         self.next_object_id = 1
         self.next_complete_object_id = 1
-
-
-    #def load_ne2ll_function(self, geodetic_path):
-        # Aggiunge al path Python la cartella che contiene geodetic_functions.py.
-       # if geodetic_path and os.path.isdir(geodetic_path) and geodetic_path not in sys.path:
-        #    sys.path.insert(0, geodetic_path)
-
-       # from geodetic_functions import ne2ll
-        #return ne2ll
 
 
 # ________________________________________________________________________________________________________________________________
@@ -83,9 +131,8 @@ class GeolocalizationNode:
     # CALLBACK PER GEOLOCALIZZAZIONE
     # ========================================================
     def classified_objects_callback(self, msg):
-        # 1. prepara il messaggio di output mantenendo lo stesso header dell'immagine/detection
-        output = GeolocatedObjectList()
-        output.header = msg.header
+        # 1. prepara la lista degli oggetti geolocalizzati per questa immagine
+        geolocated_objects = []
 
         # 2. individua il nadir
         image_width = int(msg.image.width)
@@ -96,20 +143,17 @@ class GeolocalizationNode:
             result = self.geolocalize_detection(msg, object_index, image_width)
             if result is not None:
                 geolocated_object, localization_info = result
-                output.objects.append(geolocated_object)
+                geolocated_objects.append(geolocated_object)
                 localization_infos.append(localization_info)
 
 	# 4. aggiorna e pubblica solo la lista finale degli oggetti
-        self.update_complete_object_list(output)
-        self.update_object_list(output)
+        self.update_complete_object_list(geolocated_objects)
+        self.update_object_list(geolocated_objects)
         self.publish_object_list()
-        if len(output.objects) == 0:
-            rospy.logwarn("geolocalization_node: nessun oggetto geolocalizzato in questa immagine")
-        self.save_geolocated_list_text(output, localization_infos)
-        self.save_google_my_maps_csv(output)
+        self.save_geolocated_list_text(geolocated_objects, localization_infos)
 
-    def update_complete_object_list(self, geolocated_list):
-        for geolocated_object in geolocated_list.objects:
+    def update_complete_object_list(self, geolocated_objects):
+        for geolocated_object in geolocated_objects:
             object_type = self.convert_classification(geolocated_object.object_class)
             if object_type is None:
                 continue
@@ -124,8 +168,8 @@ class GeolocalizationNode:
             })
             self.next_complete_object_id += 1
 
-    def update_object_list(self, geolocated_list):
-        for geolocated_object in geolocated_list.objects:
+    def update_object_list(self, geolocated_objects):
+        for geolocated_object in geolocated_objects:
             object_type = self.convert_classification(geolocated_object.object_class)
             if object_type is None:
                 continue
@@ -193,11 +237,12 @@ class GeolocalizationNode:
         output = self.build_object_list_output()
         json_text = json.dumps(output, indent=4)
         self.pub_object_list.publish(String(data=json_text))
-        rospy.loginfo("list_topic: pubblicata lista finale con {} oggetti unici e {} detection totali".format(
+        rospy.loginfo("[SSS] list_topic: pubblicata lista finale con {} oggetti unici e {} detection totali".format(
             len(self.object_list),
             len(self.complete_object_list)
         ))
         self.save_object_list_json()
+        self.save_detection_map()
 
     def build_object_list_output(self):
         output = OrderedDict()
@@ -237,7 +282,104 @@ class GeolocalizationNode:
                 json_file.write(json.dumps(output, indent=4))
                 json_file.write("\n")
         except IOError as exc:
-            rospy.logwarn("Impossibile salvare lista finale JSON: {} ({})".format(filename, exc))
+            rospy.logwarn("[SSS] Impossibile salvare lista finale JSON: {} ({})".format(filename, exc))
+
+    def normalize_map_object_type(self, object_type):
+        object_type = str(object_type).strip().lower()
+        if object_type in ['boa', 'buoy', 'boa_probabile', 'buoy_probabile']:
+            return 'boa'
+        if object_type in ['tubo', 'tube', 'tubo_probabile', 'tube_probabile']:
+            return 'tubo'
+        return None
+
+    def split_map_objects_by_type(self, object_list):
+        boas = []
+        tubos = []
+
+        for stored_object in object_list:
+            object_type = self.normalize_map_object_type(stored_object.get('type', ''))
+            map_object = {
+                'id': stored_object.get('id', ''),
+                'lat': float(stored_object['lat']),
+                'lon': float(stored_object['lon'])
+            }
+            if object_type == 'boa':
+                boas.append(map_object)
+            elif object_type == 'tubo':
+                tubos.append(map_object)
+
+        return boas, tubos
+
+    def plot_map_objects(self, ax, objects, color, marker, label, label_ids=False, facecolors=None):
+        if len(objects) == 0:
+            return
+
+        lats = [obj['lat'] for obj in objects]
+        lons = [obj['lon'] for obj in objects]
+
+        ax.scatter(
+            lons,
+            lats,
+            s=70,
+            c=color if facecolors is None else None,
+            marker=marker,
+            edgecolors=color,
+            facecolors=facecolors,
+            linewidths=1.5,
+            label=label,
+            zorder=4
+        )
+
+        if label_ids:
+            for obj in objects:
+                ax.text(
+                    obj['lon'],
+                    obj['lat'],
+                    str(obj['id']),
+                    fontsize=8,
+                    color=color,
+                    ha='left',
+                    va='bottom',
+                    zorder=5
+                )
+
+    def save_detection_map(self):
+        final_boas, final_tubos = self.split_map_objects_by_type(self.object_list)
+        reference_boas, reference_tubos = self.split_map_objects_by_type(MANUAL_REFERENCE_OBJECTS)
+
+        filename = os.path.join(self.list_text_folder, self.final_map_filename)
+        fig = None
+
+        try:
+            fig, ax = plt.subplots(figsize=(9, 8))
+
+            if len(MANUAL_POLYGON_POINTS) > 0:
+                polygon_lats = [float(point[0]) for point in MANUAL_POLYGON_POINTS]
+                polygon_lons = [float(point[1]) for point in MANUAL_POLYGON_POINTS]
+                polygon_lats.append(float(MANUAL_POLYGON_POINTS[0][0]))
+                polygon_lons.append(float(MANUAL_POLYGON_POINTS[0][1]))
+                ax.plot(polygon_lons, polygon_lats, color='black', linewidth=1.8, label='poligono', zorder=2)
+
+            self.plot_map_objects(ax, final_boas, 'green', 'o', 'SSS final boa', label_ids=True)
+            self.plot_map_objects(ax, final_tubos, 'blue', 's', 'SSS final tubo', label_ids=True)
+            self.plot_map_objects(ax, reference_boas, 'black', 'o', 'boa nota', facecolors='none')
+            self.plot_map_objects(ax, reference_tubos, 'black', 's', 'tubo noto', facecolors='none')
+
+            ax.set_xlabel('Longitude')
+            ax.set_ylabel('Latitude')
+            ax.set_title('SSS final object map')
+            ax.grid(True, alpha=0.3)
+            ax.axis('equal')
+            ax.legend(loc='best')
+
+            fig.savefig(filename, dpi=200, bbox_inches='tight')
+            plt.close(fig)
+            return filename
+        except Exception as exc:
+            rospy.logwarn("Impossibile salvare mappa detection: {} ({})".format(filename, exc))
+            if fig is not None:
+                plt.close(fig)
+            return None
 
 
 # ________________________________________________________________________________________________________________________________
@@ -342,7 +484,7 @@ class GeolocalizationNode:
         pitch = float(nav_status.orientation.pitch)
         yaw   = float(nav_status.orientation.yaw)
 
-	'''
+	
 	# matrice di rotazione body -> NED (roll-pitch-yaw)
         cr = math.cos(roll)
         sr = math.sin(roll)
@@ -353,38 +495,38 @@ class GeolocalizationNode:
 
         x_body, y_body, z_body = body_position
 
-        north = (cy * cp) * x_body + (cy * sp * sr - sy * cr) * y_body + (cy * sp * cr + sy * sr) * z_body
-        east = (sy * cp) * x_body + (sy * sp * sr + cy * cr) * y_body + (sy * sp * cr - cy * sr) * z_body
-        down = (-sp) * x_body + (cp * sr) * y_body + (cp * cr) * z_body
-	'''
+        #north = (cy * cp) * x_body + (cy * sp * sr - sy * cr) * y_body + (cy * sp * cr + sy * sr) * z_body
+        #east = (sy * cp) * x_body + (sy * sp * sr + cy * cr) * y_body + (sy * sp * cr - cy * sr) * z_body
+        #down = (-sp) * x_body + (cp * sr) * y_body + (cp * cr) * z_body
+	
 
 	# matrice di rotazione body -> NED (yaw)
-	x_body, y_body, z_body = body_position
+	#x_body, y_body, z_body = body_position
 
-        north = math.cos(yaw) * x_body - math.sin(yaw) * y_body		# segni!!
-        east  = math.sin(yaw) * x_body + math.cos(yaw) * y_body		# segni!!
+        north = math.cos(yaw) * x_body - math.sin(yaw) * y_body		# segni!! (-)
+        east  = math.sin(yaw) * x_body + math.cos(yaw) * y_body		# segni!! (+)
         down  = z_body
 
         return north, east, down
 
-    def save_geolocated_list_text(self, geolocated_list, localization_infos):
+    def save_geolocated_list_text(self, geolocated_objects, localization_infos):
         # salvare su file la lista finale con coordinate e dettagli della geolocalizzazione
         filename = os.path.join(self.list_text_folder, "geolocated_list_{:03d}.txt".format(self.list_text_index))
         self.list_text_index += 1
 
         try:
             with open(filename, 'w') as text_file:
-                text_file.write("geolocated_objects_count: {}\n".format(len(geolocated_list.objects)))
+                text_file.write("geolocated_objects_count: {}\n".format(len(geolocated_objects)))
                 text_file.write("sonar_range_m: {:.3f}\n".format(self.sonar_range_m))
                 text_file.write("sensor_x_offset_m: {:.3f}\n".format(self.sensor_x_offset_m))
                 text_file.write("sensor_y_offset_m: {:.3f}\n".format(self.sensor_y_offset_m))
                 text_file.write("sensor_z_offset_m: {:.3f}\n".format(self.sensor_z_offset_m))
 
-                if len(geolocated_list.objects) == 0:
+                if len(geolocated_objects) == 0:
                     text_file.write("\nNessun oggetto geolocalizzato.\n")
                     return filename
 
-                for index, geolocated_object in enumerate(geolocated_list.objects):
+                for index, geolocated_object in enumerate(geolocated_objects):
                     info = localization_infos[index]
                     text_file.write("\nOBJECT {}\n".format(index + 1))
                     text_file.write("classification: {}\n".format(geolocated_object.object_class))
@@ -422,49 +564,14 @@ class GeolocalizationNode:
 
         return filename
 
-    def save_google_my_maps_csv(self, geolocated_list):
-        # salvare un CSV importabile direttamente in Google My Maps
-        filename = os.path.join(self.list_text_folder, "google_my_maps_{:03d}.csv".format(self.list_text_index - 1))
-
-        try:
-            with open(filename, 'wb') as csv_file:
-                writer = csv.writer(csv_file)
-                writer.writerow([
-                    'name',
-                    'latitude',
-                    'longitude',
-                    'classification',
-                    'confidence',
-                    'ping_index',
-                    'centroid_x_px',
-                    'centroid_y_px',
-                    'bbox_x_px',
-                    'bbox_y_px',
-                    'bbox_width_px',
-                    'bbox_height_px'
-                ])
-
-                for index, geolocated_object in enumerate(geolocated_list.objects):
-                    writer.writerow([
-                        "object_{:03d}".format(index + 1),
-                        "{:.10f}".format(geolocated_object.latitude),
-                        "{:.10f}".format(geolocated_object.longitude),
-                        geolocated_object.object_class,
-                        "{:.3f}".format(geolocated_object.confidence),
-                        int(geolocated_object.ping_index),
-                        "{:.2f}".format(geolocated_object.centroid_x_px),
-                        "{:.2f}".format(geolocated_object.centroid_y_px),
-                        int(geolocated_object.bbox_x_px),
-                        int(geolocated_object.bbox_y_px),
-                        int(geolocated_object.bbox_width_px),
-                        int(geolocated_object.bbox_height_px)
-                    ])
-        except IOError as exc:
-            rospy.logwarn("Impossibile salvare CSV Google My Maps: {} ({})".format(filename, exc))
-
-        return filename
-
+# ============================================================
+# MAIN
+# ============================================================
 if __name__ == "__main__":
+
+    # inizializzare nodo ROS
     rospy.init_node('geolocalization_node', anonymous=True)
+    # istanziare GeolocalizationNode
     node = GeolocalizationNode()
+    # spin ROS
     rospy.spin()

@@ -19,9 +19,11 @@ class RealtimeVisualizerNode:
 
     def __init__(self):
 
+        print("[SSS] realtime_visualizer_node.py is active\n")
+
         # inizializzare subscriber/publisher
-        rospy.Subscriber('/waterfall_realtime_topic', ImageMetadata, self.realtime_waterfall_callback, queue_size=1)
-        rospy.Subscriber('/classified_objects_topic', ImageMetadata, self.classified_objects_callback, queue_size=20)
+        rospy.Subscriber('/waterfall_realtime_topic', ImageMetadata, self.realtime_waterfall_callback, queue_size=100)
+        rospy.Subscriber('/classified_objects_topic', ImageMetadata, self.classified_objects_callback, queue_size=100)
         rospy.on_shutdown(cv2.destroyAllWindows)
 
         # inizializzare CvBridge
@@ -80,10 +82,25 @@ class RealtimeVisualizerNode:
         # 2. sovrapporre bbox
         overlay = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         self.draw_detection_history(overlay, msg.ping_indices)
+        self.draw_turning_status(overlay, msg)
 
         # 3. display risultati 
         cv2.imshow(self.window_name, self.fit_to_screen(overlay))
         cv2.waitKey(1)
+
+    def draw_turning_status(self, image, msg):
+        # riga 0 = ping piu recente nella waterfall realtime
+        if len(msg.sss_states) == 0 or msg.sss_states[0] == "UNKNOWN":   # default
+            label = "Zeno turning: unknown"
+            color = (0, 255, 255)
+        elif len(msg.turning_statuses) > 0 and msg.turning_statuses[0]:
+            label = "Zeno is turning"
+            color = (0, 0, 255)
+        else:
+            label = "Zeno is not turning"
+            color = (0, 255, 0)
+
+        cv2.putText(image, label, (8, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
 
 
 

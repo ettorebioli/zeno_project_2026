@@ -1,7 +1,8 @@
 <launch>
-  <arg name="bag" default="/home/student/Downloads/allenamento_6.bag" />
+  <arg name="bag" default="/home/student/zeno_lake_experiment_SSS.bag" />
   <arg name="rate" default="1.0" />
   <arg name="loop_arg" default="" />
+  <arg name="bag_prefix" default="$(env HOME)/zeno_lake_experiment_SSS" />
 
   <node pkg="sss_package"
         type="waterfall_creator_node.py"
@@ -25,7 +26,28 @@
 
   <node pkg="rosbag"
         type="play"
-        name="allenamento_6_bag"
+        name="zeno_lake_experiment_SSS_bag"
         args="--delay=2 --rate=$(arg rate) $(arg loop_arg) $(arg bag)"
         output="screen" />
+
+      <!--
+      Salvataggio bag per esperimento al lago in
+      /home/student/zeno_lake_experiment_SSS.bag
+      -->
+  
+  <node pkg="rosbag"
+        type="record"
+        name="record_lake_experiment"
+        output="screen"
+        args="-O $(arg bag_prefix)
+
+              /drivers/altitude_sim
+              /nav_status
+              /drivers/sss_sim
+
+              /waterfall_image_topic
+              /waterfall_realtime_topic
+              /classified_objects_topic
+              /list_topic" />
+
 </launch>
