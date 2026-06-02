@@ -41,27 +41,27 @@ class ObjectClassificationNode:
         
         # definire parametri morfologici
         self.bright_morph_first_open_kernel_size  = int(rospy.get_param('~bright_morph_first_open_kernel_size', 3))	 # pulizia iniziale leggera
-        self.bright_morph_first_close_kernel_size = int(rospy.get_param('~bright_morph_first_close_kernel_size', 5)) # chiusura piccoli buchi all'interno degli oggetti
+        self.bright_morph_first_close_kernel_size = int(rospy.get_param('~bright_morph_first_close_kernel_size', 9)) # chiusura piccoli buchi all'interno degli oggetti
         self.bright_morph_final_open_kernel_size  = int(rospy.get_param('~bright_morph_final_open_kernel_size', 5))	 # pulizia finale piu' forte
         self.bright_morph_final_close_kernel_size = int(rospy.get_param('~bright_morph_final_close_kernel_size', 9)) # riconnessione frammenti dopo la pulizia finale
         self.bright_morph_iterations        	  = int(rospy.get_param('~bright_morph_iterations', 1))
 
-        self.dark_morph_first_open_kernel_size    = int(rospy.get_param('~dark_morph_first_open_kernel_size', 3))	 # rimozione piccoli blob isolati dopo aver riconnesso le ombre
         self.dark_morph_first_close_kernel_width  = int(rospy.get_param('~dark_morph_first_close_kernel_width', 5))	 # connette frammenti prima della pulizia
+        self.dark_morph_first_open_kernel_size    = int(rospy.get_param('~dark_morph_first_open_kernel_size', 3))	 # rimozione piccoli blob isolati dopo aver riconnesso le ombre
         self.dark_morph_first_close_kernel_height = int(rospy.get_param('~dark_morph_first_close_kernel_height', 3))
         self.dark_morph_iterations   		      = int(rospy.get_param('~dark_morph_iterations', 1))
 
         # definire parametri saliency
-        self.saliency_percentile   = rospy.get_param('~saliency_percentile', 70.0)
         self.cfar_train_cells      = rospy.get_param('~cfar_train_cells', 18)
-        self.cfar_guard_cells      = rospy.get_param('~cfar_guard_cells', 5)
-        self.cfar_rank_percentile  = rospy.get_param('~cfar_rank_percentile', 60.0)
+        self.cfar_guard_cells      = rospy.get_param('~cfar_guard_cells', 10)
+        self.cfar_rank_percentile  = rospy.get_param('~cfar_rank_percentile', 80.0)
         self.cfar_threshold_scale  = rospy.get_param('~cfar_threshold_scale', 1.00)
         self.cfar_threshold_offset = rospy.get_param('~cfar_threshold_offset', 2.0)
 
         # definire parametri binarizzazione
-        self.bright_percentile = rospy.get_param('~bright_percentile', 85.0)
-        self.dark_percentile   = rospy.get_param('~dark_percentile', 25.0)
+        self.saliency_percentile = rospy.get_param('~saliency_percentile', 60.0)
+        self.bright_percentile   = rospy.get_param('~bright_percentile', 85.0)
+        self.dark_percentile     = rospy.get_param('~dark_percentile', 25.0)
 
         # definire parametri detection e classification
         self.sonar_range_m                 = float(rospy.get_param('~sonar_range_m', 25.0))
@@ -70,7 +70,7 @@ class ObjectClassificationNode:
         self.alongtrack_beam_angle_deg     = float(rospy.get_param('~alongtrack_beam_angle_deg', 0.3))
         self.alongtrack_beam_angle_rad     = math.radians(self.alongtrack_beam_angle_deg)
 
-        self.min_object_area_px            = int(rospy.get_param('~min_object_area_px', 40))				# 40 << minima area dell oggetto stimata
+        self.min_object_area_px            = int(rospy.get_param('~min_object_area_px', 20))				# 20 << minima area dell oggetto stimata
         self.min_shadow_area_px            = int(rospy.get_param('~min_shadow_area_px', 20))				# 20 << minima area dell ombra stimata
         self.max_shadow_alongtrack_gap_m   = float(rospy.get_param('~max_shadow_alongtrack_gap_m', 2.5))
         self.max_shadow_acrosstrack_gap_m  = float(rospy.get_param('~max_shadow_acrosstrack_gap_m', 8.0))
@@ -86,7 +86,11 @@ class ObjectClassificationNode:
 
         self.filtered_image_folder = os.path.join(results_dir, "2_filtered_images")
         self.saliency_image_folder = os.path.join(results_dir, "3_saliency_images")
+        self.bright_saliency_image_folder = os.path.join(self.saliency_image_folder, "bright_maps")
+        self.dark_saliency_image_folder = os.path.join(self.saliency_image_folder, "dark_maps")
         self.saliency_binary_image_folder = os.path.join(results_dir, "4_saliency_binary_images")
+        self.bright_saliency_binary_image_folder = os.path.join(self.saliency_binary_image_folder, "bright_maps")
+        self.dark_saliency_binary_image_folder = os.path.join(self.saliency_binary_image_folder, "dark_maps")
 
         self.binary_maps_image_folder = os.path.join(results_dir, "5_binary_maps_images")
         self.bright_map_folder = os.path.join(self.binary_maps_image_folder, "bright_maps")
@@ -96,19 +100,30 @@ class ObjectClassificationNode:
         self.bright_and_salient_map_folder = os.path.join(self.binary_and_salient_maps_image_folder, "bright_maps")
         self.dark_and_salient_map_folder = os.path.join(self.binary_and_salient_maps_image_folder, "dark_maps")
 
-        self.classification_image_folder = os.path.join(results_dir, "7_classification_images")
+        self.morph_images_folder = os.path.join(results_dir, "7_morph_images")
+        self.bright_morph_image_folder = os.path.join(self.morph_images_folder, "bright_maps")
+        self.dark_morph_image_folder = os.path.join(self.morph_images_folder, "dark_maps")
+
+        self.classification_image_folder = os.path.join(results_dir, "8_classification_images")
         self.classification_text_folder = os.path.join(results_dir, "8_classification_texts")
 
         folders_to_create = [
             self.filtered_image_folder,
             self.saliency_image_folder,
+            self.bright_saliency_image_folder,
+            self.dark_saliency_image_folder,
             self.saliency_binary_image_folder,
+            self.bright_saliency_binary_image_folder,
+            self.dark_saliency_binary_image_folder,
             self.binary_maps_image_folder,
             self.bright_map_folder,
             self.dark_map_folder,
             self.binary_and_salient_maps_image_folder,
             self.bright_and_salient_map_folder,
             self.dark_and_salient_map_folder,
+            self.morph_images_folder,
+            self.bright_morph_image_folder,
+            self.dark_morph_image_folder,
             self.classification_image_folder,
             self.classification_text_folder
         ]
@@ -141,20 +156,22 @@ class ObjectClassificationNode:
         #saliency_map = self.compute_spectral_residual_saliency(image)
 
         # opzione 2) OS-CFAR 1D saliency separata per oggetti luminosi e ombre scure
-        bright_saliency_map, dark_saliency_map = self.compute_os_cfar_1d_saliency_maps(image)
+        bright_saliency_map, dark_saliency_map = self.compute_os_cfar_1d_saliency_maps(image)   # dark_saliency scartato per eccessiva perdita informazioni
 
         # 4. bright/dark binary maps e binary saliency maps
-        bright_map, dark_map = self.create_binary_maps(image)
+        bright_map, dark_map       = self.create_binary_maps(image)
         bright_saliency_binary_map = self.create_saliency_binary_map(bright_saliency_map)
-        dark_saliency_binary_map = self.create_saliency_binary_map(dark_saliency_map)
+        #dark_saliency_binary_map   = self.create_saliency_binary_map(dark_saliency_map)            
 
         # 5. bright/dark binary AND salient maps
         bright_and_salient_map = cv2.bitwise_and(bright_map, bright_saliency_binary_map)
-        dark_and_salient_map   = cv2.bitwise_and(dark_map, dark_saliency_binary_map)
+        #dark_and_salient_map   = cv2.bitwise_and(dark_map, dark_saliency_binary_map)              
 
         # 6. morphological cleaning
-        bright_and_salient_map = self.morphological_cleaning_bright(bright_and_salient_map)
-        dark_and_salient_map   = self.morphological_cleaning_dark(dark_and_salient_map)
+        bright_and_salient_morph_map = self.morphological_cleaning_bright(bright_and_salient_map)
+        dark_morph_map               = self.morphological_cleaning_dark(dark_map)
+        #dark_and_salient_morph_map   = self.morphological_cleaning_dark(dark_and_salient_map)
+
 
         # 7. risoluzione across-track
         self.meters_per_pixel_x = self.sonar_range_m / float(self.sonar_bins_per_side)            # Ry = 25 m / 1000 bin
@@ -167,7 +184,9 @@ class ObjectClassificationNode:
         self.meters_per_pixel_y = max(self.alongtrack_sampling_m, self.alongtrack_beam_footprint_m)
 
         # 9. classificazione oggetti usando oggetto luminoso + ombra scura
-        classifications = self.detect_and_classify_objects(bright_and_salient_map, dark_and_salient_map)
+        classifications = self.detect_and_classify_objects(bright_and_salient_morph_map, dark_morph_map)
+        #classifications = self.detect_and_classify_objects(bright_and_salient_morph_map, dark_and_salient_morph_map)
+
 
         # 10. salvataggio risultati
         image_index = self.image_index
@@ -175,11 +194,14 @@ class ObjectClassificationNode:
         self.save_bright_saliency_image(bright_saliency_map, image_index)
         self.save_dark_saliency_image(dark_saliency_map, image_index)
         self.save_bright_saliency_binary_image(bright_saliency_binary_map, image_index)
-        self.save_dark_saliency_binary_image(dark_saliency_binary_map, image_index)
+        #self.save_dark_saliency_binary_image(dark_saliency_binary_map, image_index)
         self.save_bright_map_image(bright_map, image_index)
         self.save_dark_map_image(dark_map, image_index)
         self.save_bright_and_salient_map_image(bright_and_salient_map, image_index)
-        self.save_dark_and_salient_map_image(dark_and_salient_map, image_index)
+        #self.save_dark_and_salient_map_image(dark_and_salient_map, image_index)
+        self.save_bright_and_salient_morph_map_image(bright_and_salient_morph_map, image_index)
+        #self.save_dark_and_salient_morph_map_image(dark_and_salient_morph_map, image_index)
+        self.save_dark_morph_map_image(dark_morph_map, image_index)
         self.save_classification_image(image, classifications, image_index)
         self.save_classification_text(classifications, image_index)
 
@@ -316,13 +338,6 @@ class ObjectClassificationNode:
 
         return bright_response, dark_response
 
-
-    def compute_os_cfar_1d_saliency(self, image):
-        bright_response, dark_response = self.compute_os_cfar_1d_saliency_maps(image)
-        # unire risposta bright e dark mantenendo il valore piu forte
-        return np.maximum(bright_response, dark_response).astype(np.uint8)
-
-
     def compute_os_cfar_1d_response(self, image):
         # portare l'immagine in float32 per calcolare soglie e differenze
         image_float = self.normalize_uint8(image).astype(np.float32)
@@ -346,27 +361,49 @@ class ObjectClassificationNode:
         threshold_offset = float(self.cfar_threshold_offset)
         response = np.zeros_like(image_float, dtype=np.float32)
 
-        # applicare CFAR riga per riga
-        for row in range(height):
-            data = image_float[row, :]
+        ## applicare CFAR riga per riga (across-track)
+        #for row in range(height):
+        #    data = image_float[row, :]
+        #    padded = np.pad(data, (radius, radius), mode='edge')
+        #
+        #    for col in range(width):		# col = CUT
+        #        center = col + radius
+        #
+        #        # celle training a sinistra e destra, escludendo le celle guard vicino al CUT
+        #        left_train  = padded[center - guard - train:center - guard]
+        #        right_train = padded[center + guard + 1:center + guard + train + 1]
+        #        training_cells = np.concatenate((left_train, right_train))
+        #
+        #        # soglia locale: campione ordinato scelto dal rank, scalato e traslato
+        #        noise_estimate = np.partition(training_cells, rank)[rank]
+        #        threshold = noise_estimate * threshold_scale + threshold_offset
+        #
+        #        # controllare se l'intensita' del CUT e' maggiore della soglia
+        #        # se il pixel e' maggiore della soglia, salvare quanto piu' forte e'
+        #        if data[col] > threshold:
+        #            response[row, col] = data[col] - threshold
+
+        # applicare CFAR colonna per colonna (along-track)
+        for col in range(width):
+            data = image_float[:, col]
             padded = np.pad(data, (radius, radius), mode='edge')
-
-            for col in range(width):		# col = CUT
-                center = col + radius
-
-                # celle training a sinistra e destra, escludendo le celle guard vicino al CUT
+        
+            for row in range(height):		# row = CUT
+                center = row + radius
+        
+                # celle training sopra e sotto, escludendo le celle guard vicino al CUT
                 left_train  = padded[center - guard - train:center - guard]
                 right_train = padded[center + guard + 1:center + guard + train + 1]
                 training_cells = np.concatenate((left_train, right_train))
-
+        
                 # soglia locale: campione ordinato scelto dal rank, scalato e traslato
                 noise_estimate = np.partition(training_cells, rank)[rank]
                 threshold = noise_estimate * threshold_scale + threshold_offset
-
+        
                 # controllare se l'intensita' del CUT e' maggiore della soglia
                 # se il pixel e' maggiore della soglia, salvare quanto piu' forte e'
-                if data[col] > threshold:
-                    response[row, col] = data[col] - threshold
+                if data[row] > threshold:
+                    response[row, col] = data[row] - threshold
 
         # se nessun pixel e stato rilevato, restituire una mappa nera
         max_response = float(np.max(response))
@@ -414,21 +451,20 @@ class ObjectClassificationNode:
         first_close_kernel_size = self.make_positive_odd(self.bright_morph_first_close_kernel_size)
         final_open_kernel_size  = self.make_positive_odd(self.bright_morph_final_open_kernel_size)
         final_close_kernel_size = self.make_positive_odd(self.bright_morph_final_close_kernel_size)
-        iterations = int(self.bright_morph_iterations)
 
         # generare kernel
         first_open_kernel  = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (first_open_kernel_size, first_open_kernel_size))
         first_close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (first_close_kernel_size, first_close_kernel_size))
         final_open_kernel  = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (final_open_kernel_size, final_open_kernel_size))
         final_close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (final_close_kernel_size, final_close_kernel_size))
-        # opening: eliminare piccoli blob bianchi (rumore) e separare regioni sottilmente collegate
-        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_OPEN, first_open_kernel, iterations=iterations)
-        # closing: chiudere piccoli buchi neri e collegare regioni vicine
-        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, first_close_kernel, iterations=iterations)
-        # opening finale: rimuovere piccoli blob bianchi creati o rimasti dopo il closing
-        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_OPEN, final_open_kernel, iterations=iterations)
-        # closing finale: riconnettere frammenti utili rimasti dopo l opening finale
-        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, final_close_kernel, iterations=iterations)
+        # 1) opening: eliminare piccoli blob bianchi (rumore) e separare regioni sottilmente collegate
+        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_OPEN, first_open_kernel, iterations=1)
+        # 2) closing: chiudere piccoli buchi neri e collegare regioni vicine
+        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, first_close_kernel, iterations=4)
+        # 3) opening finale: rimuovere piccoli blob bianchi creati o rimasti dopo il closing
+        #binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_OPEN, final_open_kernel, iterations=1)
+        # 4) closing finale: riconnettere frammenti utili rimasti dopo l opening finale
+        #binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, final_close_kernel, iterations=1)
         return binary_map
 
 
@@ -437,15 +473,14 @@ class ObjectClassificationNode:
         first_close_kernel_width  = self.make_positive_odd(self.dark_morph_first_close_kernel_width)
         first_close_kernel_height = self.make_positive_odd(self.dark_morph_first_close_kernel_height)
         first_open_kernel_size    = self.make_positive_odd(self.dark_morph_first_open_kernel_size)
-        iterations = int(self.dark_morph_iterations)
 
         # generare kernel
         first_open_kernel  = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (first_open_kernel_size, first_open_kernel_size))
         first_close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (first_close_kernel_width, first_close_kernel_height))
-        # closing: chiudere piccoli buchi neri e collegare regioni vicine
-        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, first_close_kernel, iterations=iterations)
-        # opening: rimuovere piccoli blob bianchi creati o rimasti dopo il closing
-        binary_map  = cv2.morphologyEx(binary_map, cv2.MORPH_OPEN, first_open_kernel, iterations=iterations)
+        # 1) closing: chiudere piccoli buchi neri e collegare regioni vicine
+        binary_map = cv2.morphologyEx(binary_map, cv2.MORPH_CLOSE, first_close_kernel, iterations=1)
+        # 2) opening: rimuovere piccoli blob bianchi creati o rimasti dopo il closing
+        binary_map  = cv2.morphologyEx(binary_map, cv2.MORPH_OPEN, first_open_kernel, iterations=1)
         return binary_map
 
 
@@ -724,19 +759,19 @@ class ObjectClassificationNode:
         return self.save_debug_image( self.saliency_image_folder, "saliency", self.normalize_uint8(saliency_map), image_index)
 
     def save_bright_saliency_image(self, saliency_map, image_index):
-        return self.save_debug_image(self.saliency_image_folder, "bright_saliency", self.normalize_uint8(saliency_map), image_index)
+        return self.save_debug_image(self.bright_saliency_image_folder, "bright_saliency", self.normalize_uint8(saliency_map), image_index)
 
     def save_dark_saliency_image(self, saliency_map, image_index):
-        return self.save_debug_image(self.saliency_image_folder, "dark_saliency", self.normalize_uint8(saliency_map), image_index)
+        return self.save_debug_image(self.dark_saliency_image_folder, "dark_saliency", self.normalize_uint8(saliency_map), image_index)
 
     def save_saliency_binary_image(self, saliency_binary_map, image_index):
         return self.save_debug_image(self.saliency_binary_image_folder, "saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
 
     def save_bright_saliency_binary_image(self, saliency_binary_map, image_index):
-        return self.save_debug_image(self.saliency_binary_image_folder, "bright_saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
+        return self.save_debug_image(self.bright_saliency_binary_image_folder, "bright_saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
 
     def save_dark_saliency_binary_image(self, saliency_binary_map, image_index):
-        return self.save_debug_image(self.saliency_binary_image_folder, "dark_saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
+        return self.save_debug_image(self.dark_saliency_binary_image_folder, "dark_saliency_binary", self.normalize_uint8(saliency_binary_map), image_index)
 
     def save_bright_map_image(self, bright_map, image_index):
         return self.save_debug_image( self.bright_map_folder, "bright", self.normalize_uint8(bright_map), image_index)
@@ -749,6 +784,15 @@ class ObjectClassificationNode:
 
     def save_dark_and_salient_map_image(self, dark_map, image_index):
         return self.save_debug_image(self.dark_and_salient_map_folder, "dark_and_salient", self.normalize_uint8(dark_map), image_index)
+
+    def save_bright_and_salient_morph_map_image(self, bright_map, image_index):
+        return self.save_debug_image(self.bright_morph_image_folder, "bright_and_salient_morph", self.normalize_uint8(bright_map), image_index)
+
+    #def save_dark_and_salient_morph_map_image(self, dark_map, image_index):
+    #    return self.save_debug_image(self.dark_morph_image_folder, "dark_and_salient_morph", self.normalize_uint8(dark_map), image_index)
+
+    def save_dark_morph_map_image(self, dark_map, image_index):
+        return self.save_debug_image(self.dark_morph_image_folder, "dark_morph", self.normalize_uint8(dark_map), image_index)
 
     def save_classification_image(self, image, classifications, image_index):
         output = cv2.cvtColor(self.normalize_uint8(image), cv2.COLOR_GRAY2BGR)
