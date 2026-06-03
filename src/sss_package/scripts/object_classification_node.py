@@ -75,6 +75,13 @@ class ObjectClassificationNode:
         self.max_shadow_alongtrack_gap_m   = float(rospy.get_param('~max_shadow_alongtrack_gap_m', 2.5))
         self.max_shadow_acrosstrack_gap_m  = float(rospy.get_param('~max_shadow_acrosstrack_gap_m', 8.0))
         self.min_classification_confidence = float(rospy.get_param('~min_classification_confidence', 0.35))
+        self.tie_buoy_max_area_m2          = float(rospy.get_param('~tie_buoy_max_area_m2', 0.45))
+        self.tie_buoy_max_dimension_m      = float(rospy.get_param('~tie_buoy_max_dimension_m', 1.6))
+        self.tie_buoy_max_aspect_ratio     = float(rospy.get_param('~tie_buoy_max_aspect_ratio', 3.2))
+        self.tie_tube_min_area_m2          = float(rospy.get_param('~tie_tube_min_area_m2', 0.55))
+        self.tie_tube_min_dimension_m      = float(rospy.get_param('~tie_tube_min_dimension_m', 2.0))
+        self.tie_tube_min_aspect_ratio     = float(rospy.get_param('~tie_tube_min_aspect_ratio', 3.2))
+        self.buoy_far_shadow_gap_m         = float(rospy.get_param('~buoy_far_shadow_gap_m', 2.0))
 
 
         # creazione cartelle per risultati 
@@ -599,6 +606,8 @@ class ObjectClassificationNode:
             # associare all'oggetto l'ombra piu' plausibile
             best_shadow = None
             best_pair_score = -1.0
+            best_alongtrack_gap_m = 0.0
+            best_acrosstrack_gap_m = 0.0
 
             for candidate_shadow in shadows:
                 # leggere i centroidi in pixel di oggetto e ombra
@@ -635,9 +644,13 @@ class ObjectClassificationNode:
                 if pair_score > best_pair_score:
                     best_pair_score = pair_score
                     best_shadow = candidate_shadow
+                    best_alongtrack_gap_m = alongtrack_gap_m
+                    best_acrosstrack_gap_m = acrosstrack_gap_m
 
             shadow = best_shadow
             pair_score = best_pair_score
+            alongtrack_gap_m = best_alongtrack_gap_m
+            acrosstrack_gap_m = best_acrosstrack_gap_m
             if shadow is None:
                 continue
 
@@ -665,18 +678,25 @@ class ObjectClassificationNode:
                 buoy_score += 1.0
             if 1.0 <= shadow_ratio <= 5.0:
                 buoy_score += 1.0
+            if acrosstrack_gap_m >= self.buoy_far_shadow_gap_m:
+                buoy_score += 1.0
 
             # usare il punteggio migliore come base per la confidenza finale
             max_score = max(tube_score, buoy_score)
-            confidence = max_score / self.MAX_CLASSIFICATION_SCORE
+            confidence = min(max_score / self.MAX_CLASSIFICATION_SCORE, 1.0)
 
             # sotto soglia la detection resta ignota, sopra soglia vince il punteggio maggiore
             if confidence < self.min_classification_confidence:
                 classification = 'unknown'
-            elif tube_score >= buoy_score:
+                tie_breaker = 'below_confidence_threshold'
+            elif tube_score > buoy_score:
                 classification = 'tube'
-            else:
+                tie_breaker = 'not_needed'
+            elif buoy_score > tube_score:
                 classification = 'buoy'
+                tie_breaker = 'not_needed'
+            else:
+                classification, tie_breaker = self.resolve_classification_tie(obj)
 
             # salvare oggetto, ombra e punteggi
             object_data = {
@@ -709,11 +729,39 @@ class ObjectClassificationNode:
                 'tube_score': round(float(tube_score), 3),
                 'buoy_score': round(float(buoy_score), 3),
                 'pair_score': round(float(pair_score), 3),
+                'alongtrack_gap_m': round(float(alongtrack_gap_m), 3),
+                'acrosstrack_gap_m': round(float(acrosstrack_gap_m), 3),
+                'tie_breaker': tie_breaker,
                 'object': object_data,
                 'shadow': shadow_data
             })
 
         return detections
+
+    def resolve_classification_tie(self, obj):
+        tube_tie_score = 0.0
+        buoy_tie_score = 0.0
+
+        if obj['area_m2'] <= self.tie_buoy_max_area_m2:
+            buoy_tie_score += 1.0
+        if obj['max_dimension_m'] <= self.tie_buoy_max_dimension_m:
+            buoy_tie_score += 1.0
+        if obj['aspect_ratio'] <= self.tie_buoy_max_aspect_ratio:
+            buoy_tie_score += 1.0
+
+        if obj['area_m2'] >= self.tie_tube_min_area_m2:
+            tube_tie_score += 1.0
+        if obj['max_dimension_m'] >= self.tie_tube_min_dimension_m:
+            tube_tie_score += 1.0
+        if obj['aspect_ratio'] >= self.tie_tube_min_aspect_ratio:
+            tube_tie_score += 1.0
+
+        if tube_tie_score > buoy_tie_score:
+            return 'tube', 'tube_geometry_area'
+        if buoy_tie_score > tube_tie_score:
+            return 'buoy', 'buoy_geometry_area'
+
+        return 'unknown', 'unresolved_equal_score'
 
     def rotated_bbox_points(self, pixel_rect):
         # convertire il rettangolo orientato di OpenCV nei quattro vertici
@@ -801,6 +849,13 @@ class ObjectClassificationNode:
                 text_file.write("max_shadow_alongtrack_gap_m: {:.3f}\n".format(self.max_shadow_alongtrack_gap_m))
                 text_file.write("max_shadow_accrosstrack_gap_m: {:.3f}\n".format(self.max_shadow_acrosstrack_gap_m))
                 text_file.write("min_classification_confidence: {:.3f}\n".format(self.min_classification_confidence))
+                text_file.write("tie_buoy_max_area_m2: {:.3f}\n".format(self.tie_buoy_max_area_m2))
+                text_file.write("tie_buoy_max_dimension_m: {:.3f}\n".format(self.tie_buoy_max_dimension_m))
+                text_file.write("tie_buoy_max_aspect_ratio: {:.3f}\n".format(self.tie_buoy_max_aspect_ratio))
+                text_file.write("tie_tube_min_area_m2: {:.3f}\n".format(self.tie_tube_min_area_m2))
+                text_file.write("tie_tube_min_dimension_m: {:.3f}\n".format(self.tie_tube_min_dimension_m))
+                text_file.write("tie_tube_min_aspect_ratio: {:.3f}\n".format(self.tie_tube_min_aspect_ratio))
+                text_file.write("buoy_far_shadow_gap_m: {:.3f}\n".format(self.buoy_far_shadow_gap_m))
 
                 if len(classifications) == 0:
                     text_file.write("\nNessuna detection trovata.\n")
@@ -816,6 +871,9 @@ class ObjectClassificationNode:
                     text_file.write("tube_score: {:.3f}\n".format(detection['tube_score']))
                     text_file.write("buoy_score: {:.3f}\n".format(detection['buoy_score']))
                     text_file.write("pair_score: {:.3f}\n".format(detection['pair_score']))
+                    text_file.write("alongtrack_gap_m: {:.3f}\n".format(detection['alongtrack_gap_m']))
+                    text_file.write("acrosstrack_gap_m: {:.3f}\n".format(detection['acrosstrack_gap_m']))
+                    text_file.write("tie_breaker: {}\n".format(detection.get('tie_breaker', 'not_available')))
                     text_file.write("sss_state: {}\n".format(detection.get('sss_state', 'UNKNOWN')))
                     text_file.write("isturning: {}\n".format(str(detection.get('isturning', False)).lower()))
 

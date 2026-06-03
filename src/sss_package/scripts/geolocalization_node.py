@@ -25,6 +25,9 @@ from geodetic_functions import ne2ll
 # DATI MANUALI PER MAPPA FINALE
 # ============================================================
 # Inserire punti come (latitudine, longitudine).
+MANUAL_POLYGON_POINTS = []
+MANUAL_REFERENCE_OBJECTS = []
+
 """
 MANUAL_POLYGON_POINTS = [
 
@@ -108,6 +111,7 @@ class GeolocalizationNode:
         self.sensor_z_offset_m = float(rospy.get_param('~sensor_z_offset_m', 0.096))
         self.object_match_distance_m = float(rospy.get_param('~object_match_distance_m', 3.0))
         self.final_map_filename = rospy.get_param('~final_map_filename', 'final_detection_map.png')
+        self.safezone_polygon_points = self.load_safezone_polygon_points()
 
         # creazione cartelle per i risultati
         rospack = rospkg.RosPack()
@@ -116,6 +120,10 @@ class GeolocalizationNode:
         self.list_text_folder = rospy.get_param('~list_text_folder', default_folder)
         if not os.path.exists(self.list_text_folder):
             os.makedirs(self.list_text_folder)
+        self.object_list_json_filename = os.path.join(
+            self.list_text_folder,
+            "SSS_object_list.json"
+        )
 
         # definire parametri oggetti
         self.list_text_index = 0
@@ -174,6 +182,12 @@ class GeolocalizationNode:
             object_type = self.convert_classification(geolocated_object.object_class)
             if object_type is None:
                 continue
+            if not self.is_geolocated_object_inside_safezone(geolocated_object):
+                rospy.loginfo("[SSS] Detection esclusa dalla lista finale: fuori safezone lat={:.10f} lon={:.10f}".format(
+                    float(geolocated_object.latitude),
+                    float(geolocated_object.longitude)
+                ))
+                continue
 
             existing_object = self.find_matching_object(geolocated_object, object_type)
             if existing_object is None:
@@ -218,6 +232,76 @@ class GeolocalizationNode:
             [float(geolocated_object.latitude), float(geolocated_object.longitude)]
         )
         return math.sqrt((north_m * north_m) + (east_m * east_m))
+
+    def is_geolocated_object_inside_safezone(self, geolocated_object):
+        return self.is_point_inside_safezone(
+            float(geolocated_object.latitude),
+            float(geolocated_object.longitude)
+        )
+
+    def is_point_inside_safezone(self, latitude, longitude):
+        if len(self.safezone_polygon_points) < 3:
+            return True
+
+        return self.is_point_inside_polygon(
+            float(latitude),
+            float(longitude),
+            self.safezone_polygon_points
+        )
+
+    def is_point_inside_polygon(self, latitude, longitude, polygon_points):
+        inside = False
+        point_lat = float(latitude)
+        point_lon = float(longitude)
+        previous_lat = float(polygon_points[-1][0])
+        previous_lon = float(polygon_points[-1][1])
+
+        for point in polygon_points:
+            current_lat = float(point[0])
+            current_lon = float(point[1])
+
+            if self.is_point_on_polygon_edge(
+                point_lat,
+                point_lon,
+                previous_lat,
+                previous_lon,
+                current_lat,
+                current_lon
+            ):
+                return True
+
+            crosses_latitude = ((current_lat > point_lat) != (previous_lat > point_lat))
+            if crosses_latitude:
+                lon_at_point_lat = (
+                    (previous_lon - current_lon) * (point_lat - current_lat) /
+                    (previous_lat - current_lat)
+                ) + current_lon
+                if point_lon < lon_at_point_lat:
+                    inside = not inside
+
+            previous_lat = current_lat
+            previous_lon = current_lon
+
+        return inside
+
+    def is_point_on_polygon_edge(self, point_lat, point_lon, start_lat, start_lon, end_lat, end_lon):
+        epsilon = 1e-12
+        cross_product = (
+            (point_lon - start_lon) * (end_lat - start_lat) -
+            (point_lat - start_lat) * (end_lon - start_lon)
+        )
+        if abs(cross_product) > epsilon:
+            return False
+
+        min_lat = min(start_lat, end_lat) - epsilon
+        max_lat = max(start_lat, end_lat) + epsilon
+        min_lon = min(start_lon, end_lon) - epsilon
+        max_lon = max(start_lon, end_lon) + epsilon
+
+        return (
+            min_lat <= point_lat <= max_lat and
+            min_lon <= point_lon <= max_lon
+        )
 
     def update_existing_object(self, stored_object, geolocated_object):
         old_count = int(stored_object['obs_count'])
@@ -272,18 +356,20 @@ class GeolocalizationNode:
         return output
 
     def save_object_list_json(self):
-        filename = os.path.join(self.list_text_folder, "final_object_list.json")
         output = OrderedDict([
             ('final_list', self.build_object_list_output()),
-            ('complete_list', self.build_complete_object_list_output())
+            #('complete_list', self.build_complete_object_list_output())
         ])
 
         try:
-            with open(filename, 'w') as json_file:
+            with open(self.object_list_json_filename, 'w') as json_file:
                 json_file.write(json.dumps(output, indent=4))
                 json_file.write("\n")
         except IOError as exc:
-            rospy.logwarn("[SSS] Impossibile salvare lista finale JSON: {} ({})".format(filename, exc))
+            rospy.logwarn("[SSS] Impossibile salvare lista finale JSON: {} ({})".format(
+                self.object_list_json_filename,
+                exc
+            ))
 
     def normalize_map_object_type(self, object_type):
         object_type = str(object_type).strip().lower()
@@ -344,6 +430,92 @@ class GeolocalizationNode:
                     zorder=5
                 )
 
+    def load_safezone_polygon_points(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        file_name = os.path.join(script_dir, "safezone.txt")
+        polygon_points = []
+
+        if not os.path.exists(file_name):
+            rospy.logwarn("[SSS] File safezone non trovato: {}".format(file_name))
+            return polygon_points
+
+        try:
+            with open(file_name, 'r') as safezone_file:
+                for line_number, line in enumerate(safezone_file, 1):
+                    clean_line = line.strip()
+                    if clean_line == '' or clean_line.startswith('#'):
+                        continue
+
+                    parts = clean_line.split(',')
+                    if len(parts) != 2:
+                        rospy.logwarn("[SSS] Riga safezone ignorata {}: {}".format(line_number, line.strip()))
+                        continue
+
+                    try:
+                        longitude = float(parts[0].strip())
+                        latitude = float(parts[1].strip())
+                        polygon_points.append((latitude, longitude))
+                    except ValueError:
+                        rospy.logwarn("[SSS] Riga safezone non numerica ignorata {}: {}".format(
+                            line_number,
+                            line.strip()
+                        ))
+
+            return polygon_points
+        except IOError as exc:
+            rospy.logwarn("[SSS] Impossibile leggere safezone: {} ({})".format(file_name, exc))
+            return []
+
+    def plot_polygon_points(self, ax, polygon_points, color, label):
+        if len(polygon_points) == 0:
+            return
+
+        polygon_lats = [float(point[0]) for point in polygon_points]
+        polygon_lons = [float(point[1]) for point in polygon_points]
+        polygon_lats.append(float(polygon_points[0][0]))
+        polygon_lons.append(float(polygon_points[0][1]))
+        ax.plot(polygon_lons, polygon_lats, color=color, linewidth=1.8, label=label, zorder=2)
+
+    def collect_map_axis_points(self, object_groups, polygon_groups):
+        axis_points = []
+
+        for object_group in object_groups:
+            for map_object in object_group:
+                axis_points.append((float(map_object['lat']), float(map_object['lon'])))
+
+        for polygon_group in polygon_groups:
+            for point in polygon_group:
+                axis_points.append((float(point[0]), float(point[1])))
+
+        return axis_points
+
+    def apply_map_axis_limits(self, ax, axis_points):
+        if len(axis_points) == 0:
+            return
+
+        lats = [point[0] for point in axis_points]
+        lons = [point[1] for point in axis_points]
+        min_lat = min(lats)
+        max_lat = max(lats)
+        min_lon = min(lons)
+        max_lon = max(lons)
+
+        lat_span = max_lat - min_lat
+        lon_span = max_lon - min_lon
+        min_span = 0.0001
+        if lat_span < min_span:
+            lat_padding = min_span / 2.0
+        else:
+            lat_padding = lat_span * 0.15
+
+        if lon_span < min_span:
+            lon_padding = min_span / 2.0
+        else:
+            lon_padding = lon_span * 0.15
+
+        ax.set_xlim(min_lon - lon_padding, max_lon + lon_padding)
+        ax.set_ylim(min_lat - lat_padding, max_lat + lat_padding)
+
     def save_detection_map(self):
         final_boas, final_tubos = self.split_map_objects_by_type(self.object_list)
         reference_boas, reference_tubos = self.split_map_objects_by_type(MANUAL_REFERENCE_OBJECTS)
@@ -354,23 +526,25 @@ class GeolocalizationNode:
         try:
             fig, ax = plt.subplots(figsize=(9, 8))
 
-            if len(MANUAL_POLYGON_POINTS) > 0:
-                polygon_lats = [float(point[0]) for point in MANUAL_POLYGON_POINTS]
-                polygon_lons = [float(point[1]) for point in MANUAL_POLYGON_POINTS]
-                polygon_lats.append(float(MANUAL_POLYGON_POINTS[0][0]))
-                polygon_lons.append(float(MANUAL_POLYGON_POINTS[0][1]))
-                ax.plot(polygon_lons, polygon_lats, color='black', linewidth=1.8, label='poligono', zorder=2)
+            self.plot_polygon_points(ax, MANUAL_POLYGON_POINTS, 'black', 'poligono manuale')
+            self.plot_polygon_points(ax, self.safezone_polygon_points, 'red', 'safezone')
 
             self.plot_map_objects(ax, final_boas, 'green', 'o', 'SSS final boa', label_ids=True)
             self.plot_map_objects(ax, final_tubos, 'blue', 's', 'SSS final tubo', label_ids=True)
             self.plot_map_objects(ax, reference_boas, 'black', 'o', 'boa nota', facecolors='none')
             self.plot_map_objects(ax, reference_tubos, 'black', 's', 'tubo noto', facecolors='none')
 
+            axis_points = self.collect_map_axis_points(
+                [final_boas, final_tubos, reference_boas, reference_tubos],
+                [MANUAL_POLYGON_POINTS, self.safezone_polygon_points]
+            )
+            self.apply_map_axis_limits(ax, axis_points)
+
             ax.set_xlabel('Longitude')
             ax.set_ylabel('Latitude')
             ax.set_title('SSS final object map')
             ax.grid(True, alpha=0.3)
-            ax.axis('equal')
+            ax.set_aspect('equal', adjustable='box')
             ax.legend(loc='best')
 
             fig.savefig(filename, dpi=200, bbox_inches='tight')
@@ -504,8 +678,8 @@ class GeolocalizationNode:
 	# matrice di rotazione body -> NED (yaw)
 	#x_body, y_body, z_body = body_position
 
-        north = math.cos(yaw) * x_body - math.sin(yaw) * y_body		# segni!! (-)
-        east  = math.sin(yaw) * x_body + math.cos(yaw) * y_body		# segni!! (+)
+        north = math.cos(yaw) * x_body - math.sin(yaw) * y_body
+        east  = math.sin(yaw) * x_body + math.cos(yaw) * y_body
         down  = z_body
 
         return north, east, down
