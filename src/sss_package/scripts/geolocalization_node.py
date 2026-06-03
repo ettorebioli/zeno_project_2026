@@ -25,6 +25,7 @@ from geodetic_functions import ne2ll
 # DATI MANUALI PER MAPPA FINALE
 # ============================================================
 # Inserire punti come (latitudine, longitudine).
+"""
 MANUAL_POLYGON_POINTS = [
 
     # allenamento_7_10
@@ -35,7 +36,7 @@ MANUAL_POLYGON_POINTS = [
     (43.7067599, 10.4752309),
     (43.7065117, 10.4750928)
 ]
-
+ 
 # inserire oggetti noti del file .csv
 MANUAL_REFERENCE_OBJECTS = [
     
@@ -85,7 +86,7 @@ MANUAL_REFERENCE_OBJECTS = [
     #{'type': 'tubo', 'lat': 43.7066209, 'lon': 10.4754706},
 
 ]
-
+"""
 
 # ============================================================
 # CLASSE PRINCIPALE NODO GEOLOCALIZATION

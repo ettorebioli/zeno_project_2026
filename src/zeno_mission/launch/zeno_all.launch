@@ -1,18 +1,47 @@
 <launch>
     <arg name="phase" default="1" doc="Fase di missione da eseguire (1 per Pure Pursuit, 3 per RRT Path Tracking)" />
+    
+    <arg name="bag_prefix" default="$(find zeno_mission)/BAG/zeno_phase_$(arg phase)" />
+
+    <include file="$(find zeno_sim_pkg)/launch/zeno.launch" />
 
     <group if="$(eval arg('phase') == 1)">
         <include file="$(find zeno_mission)/launch/zeno_phase1.launch" />
         <include file="$(find fls_detection)/launch/FLS_launch.launch" />
         <include file="$(find sss_package)/launch/sss.launch" />
-        
-
     </group>
 
     <group if="$(eval arg('phase') == 3)">
         <include file="$(find zeno_mission)/launch/zeno_phase3.launch" /> 
         <include file="$(find fls_detection)/launch/FLS_launch.launch" />
         <include file="$(find sss_package)/launch/sss.launch" />
-        
     </group>
+
+    <node pkg="rosbag"
+          type="record"
+          name="record_lake_experiment"
+          output="screen"
+          args="-o $(arg bag_prefix)
+                /nav_status
+                /relative_error
+                /phase1/telemetry
+                /phase3/telemetry
+                /phase1/SSS
+                /phase3/SSS
+                /waypoint_path
+
+          
+                /drivers/altitude_sim
+                /drivers/sss_sim
+                /waterfall_image_topic
+                /waterfall_realtime_topic
+                /classified_objects_topic
+                /list_topic
+
+                /perception/targe_localized_json
+                /perception/global_map_json
+                /drivers/fls_sim/cartesian_image/compressed
+                /drivers/fls_sim/polar_image/compressed
+                " />
 </launch>
+
