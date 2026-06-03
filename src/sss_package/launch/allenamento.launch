@@ -1,5 +1,5 @@
 <launch>
-  <arg name="bag" default="/home/student/Downloads/fase_1_costansea.bag" />
+  <arg name="bag" default="/home/student/Downloads/allenamento_10.bag" />
   <arg name="rate" default="1.0" />
   <arg name="loop_arg" default="" />
   <arg name="bag_prefix" default="$(env HOME)/zeno_lake_experiment_SSS" />
@@ -26,14 +26,14 @@
 
   <node pkg="rosbag"
         type="play"
-        name="fase_1_costansea_bag"
+        name="allenamento_10_bag"
         args="--delay=2 --rate=$(arg rate) $(arg loop_arg) $(arg bag)"
         output="screen" />
 
       <!--
       Salvataggio bag per esperimento al lago in
       /home/student/zeno_lake_experiment_SSS.bag
-      -->
+      
   
   <node pkg="rosbag"
         type="record"
@@ -51,5 +51,5 @@
               /waterfall_realtime_topic
               /classified_objects_topic
               /list_topic" />
-
+      -->
 </launch>
