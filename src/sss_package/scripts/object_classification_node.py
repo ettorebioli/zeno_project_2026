@@ -70,8 +70,8 @@ class ObjectClassificationNode:
         self.alongtrack_beam_angle_deg     = float(rospy.get_param('~alongtrack_beam_angle_deg', 0.3))
         self.alongtrack_beam_angle_rad     = math.radians(self.alongtrack_beam_angle_deg)
 
-        self.min_object_area_px            = int(rospy.get_param('~min_object_area_px', 20))				# 20 << minima area dell oggetto stimata
-        self.min_shadow_area_px            = int(rospy.get_param('~min_shadow_area_px', 20))				# 20 << minima area dell ombra stimata
+        self.min_object_area_px            = int(rospy.get_param('~min_object_area_px', 30))				# 20 << minima area dell oggetto stimata
+        self.min_shadow_area_px            = int(rospy.get_param('~min_shadow_area_px', 30))				# 20 << minima area dell ombra stimata
         self.max_shadow_alongtrack_gap_m   = float(rospy.get_param('~max_shadow_alongtrack_gap_m', 2.5))
         self.max_shadow_acrosstrack_gap_m  = float(rospy.get_param('~max_shadow_acrosstrack_gap_m', 8.0))
         self.min_classification_confidence = float(rospy.get_param('~min_classification_confidence', 0.35))
@@ -657,11 +657,11 @@ class ObjectClassificationNode:
 
             # boa attesa: piu' compatta e con ombra abbastanza lunga rispetto all'oggetto
             buoy_score = pair_score
-            if 0.3 <= obj['max_dimension_m'] <= 1.9: #2.7
+            if 0.3 <= obj['max_dimension_m'] <= 2.7: #2.7 (1.9)
                 buoy_score += 1.0
             if 0.3 <= obj['min_dimension_m'] <= 1.2:
                 buoy_score += 1.0
-            if 1.0 <= obj['aspect_ratio'] <= 2.0:   #2.467 3.6 2.796
+            if 1.0 <= obj['aspect_ratio'] <= 4.0:   #2.467 3.6 2.796 (2.0)
                 buoy_score += 1.0
             if 1.0 <= shadow_ratio <= 5.0:
                 buoy_score += 1.0

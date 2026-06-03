@@ -1,5 +1,5 @@
 <launch>
-  <arg name="bag" default="/home/student/zeno_lake_experiment_SSS.bag" />
+  <arg name="bag" default="/home/student/Downloads/fase_1_costansea.bag" />
   <arg name="rate" default="1.0" />
   <arg name="loop_arg" default="" />
   <arg name="bag_prefix" default="$(env HOME)/zeno_lake_experiment_SSS" />
@@ -26,7 +26,7 @@
 
   <node pkg="rosbag"
         type="play"
-        name="zeno_lake_experiment_SSS_bag"
+        name="fase_1_costansea_bag"
         args="--delay=2 --rate=$(arg rate) $(arg loop_arg) $(arg bag)"
         output="screen" />
 
@@ -44,6 +44,8 @@
               /drivers/altitude_sim
               /nav_status
               /drivers/sss_sim
+              /phase1/SSS
+              /phase3/SSS
 
               /waterfall_image_topic
               /waterfall_realtime_topic
