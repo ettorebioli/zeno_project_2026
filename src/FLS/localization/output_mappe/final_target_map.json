@@ -1,144 +1,132 @@
 {
     "1": {
-        "confidence": 0.547, 
+        "confidence": 0.35, 
         "type_votes": {
-            "boa_probabile": 87.46000000000002, 
-            "tubo_probabile": 10.590000000000002
+            "boa_probabile": 6.289999999999999, 
+            "tubo_probabile": 46.15999999999999
         }, 
-        "obs_count": 160, 
-        "lon": 10.475414505965878, 
-        "lat": 43.70660111152676, 
-        "type": "boa_probabile"
+        "obs_count": 132, 
+        "lon": 10.475512261683484, 
+        "lat": 43.70655539984416, 
+        "type": "tubo_probabile"
     }, 
     "2": {
-        "confidence": 0.142, 
+        "confidence": 0.84, 
         "type_votes": {
-            "boa_probabile": 1.0, 
-            "tubo_probabile": 11.32
+            "boa_probabile": 142.7900000000001, 
+            "tubo_probabile": 0.0
         }, 
-        "obs_count": 80, 
-        "lon": 10.475505694833453, 
-        "lat": 43.70655121692234, 
-        "type": "tubo_probabile"
-    }, 
-    "3": {
-        "confidence": 0.78, 
-        "type_votes": {
-            "boa_probabile": 122.46999999999998, 
-            "tubo_probabile": 0.30000000000000004
-        }, 
-        "obs_count": 157, 
-        "lon": 10.475425369831667, 
-        "lat": 43.706484759028044, 
+        "obs_count": 170, 
+        "lon": 10.475457587694935, 
+        "lat": 43.706519603349264, 
         "type": "boa_probabile"
     }, 
-    "4": {
-        "confidence": 0.317, 
+    "3": {
+        "confidence": 0.052, 
         "type_votes": {
-            "boa_probabile": 6.99, 
-            "tubo_probabile": 22.839999999999993
+            "boa_probabile": 1.28, 
+            "tubo_probabile": 4.219999999999999
         }, 
-        "obs_count": 72, 
-        "lon": 10.475302897849412, 
-        "lat": 43.70655988887681, 
+        "obs_count": 81, 
+        "lon": 10.47559120505261, 
+        "lat": 43.70650601869421, 
         "type": "tubo_probabile"
+    }, 
+    "4": {
+        "confidence": 0.714, 
+        "type_votes": {
+            "boa_probabile": 69.97000000000003
+        }, 
+        "obs_count": 98, 
+        "lon": 10.475503682998118, 
+        "lat": 43.706388775159766, 
+        "type": "boa_probabile"
     }, 
     "5": {
-        "confidence": 0.36, 
+        "confidence": 0.852, 
         "type_votes": {
-            "boa_probabile": 1.33, 
-            "tubo_probabile": 15.100000000000001
+            "boa_probabile": 41.74999999999998, 
+            "tubo_probabile": 0.0
         }, 
-        "obs_count": 42, 
-        "lon": 10.475331270245691, 
-        "lat": 43.70667850549826, 
-        "type": "tubo_probabile"
+        "obs_count": 49, 
+        "lon": 10.475661693263174, 
+        "lat": 43.70641414896441, 
+        "type": "boa_probabile"
     }, 
-    "6": {
-        "confidence": 0.591, 
+    "7": {
+        "confidence": 0.697, 
         "type_votes": {
-            "boa_probabile": 65.56000000000002, 
-            "tubo_probabile": 0.8200000000000001
+            "boa_probabile": 91.97999999999995, 
+            "tubo_probabile": 0.0
         }, 
-        "obs_count": 111, 
-        "lon": 10.475207104948577, 
-        "lat": 43.70662962173037, 
+        "obs_count": 132, 
+        "lon": 10.475425410104881, 
+        "lat": 43.70659576414295, 
         "type": "boa_probabile"
     }, 
     "8": {
-        "confidence": 0.381, 
+        "confidence": 0.409, 
         "type_votes": {
-            "boa_probabile": 0.76, 
-            "tubo_probabile": 16.02
+            "boa_probabile": 6.620000000000001, 
+            "tubo_probabile": 30.669999999999987
         }, 
-        "obs_count": 42, 
-        "lon": 10.47514283080329, 
-        "lat": 43.70655083240506, 
+        "obs_count": 75, 
+        "lon": 10.475362695196182, 
+        "lat": 43.706474860226635, 
         "type": "tubo_probabile"
     }, 
     "9": {
-        "confidence": 0.806, 
+        "confidence": 0.791, 
         "type_votes": {
-            "boa_probabile": 70.90000000000003
+            "boa_probabile": 96.51000000000002, 
+            "tubo_probabile": 0.8
         }, 
-        "obs_count": 88, 
-        "lon": 10.47525898782351, 
-        "lat": 43.70651792579437, 
+        "obs_count": 122, 
+        "lon": 10.475265478907993, 
+        "lat": 43.706536909008754, 
         "type": "boa_probabile"
     }, 
     "10": {
-        "confidence": 0.506, 
+        "confidence": 0.224, 
         "type_votes": {
-            "boa_probabile": 7.420000000000001, 
-            "tubo_probabile": 28.840000000000007
+            "boa_probabile": 2.25, 
+            "tubo_probabile": 23.549999999999986
         }, 
-        "obs_count": 57, 
-        "lon": 10.475366848113033, 
-        "lat": 43.706460177164885, 
+        "obs_count": 105, 
+        "lon": 10.475333032935728, 
+        "lat": 43.70656281510307, 
         "type": "tubo_probabile"
     }, 
     "11": {
-        "confidence": 0.073, 
+        "confidence": 0.429, 
         "type_votes": {
-            "boa_probabile": 2.2800000000000002, 
-            "tubo_probabile": 2.6400000000000006
+            "boa_probabile": 1.92, 
+            "tubo_probabile": 27.000000000000018
         }, 
-        "obs_count": 36, 
-        "lon": 10.475557431544633, 
-        "lat": 43.7064713466579, 
+        "obs_count": 63, 
+        "lon": 10.47532511881025, 
+        "lat": 43.70669870813951, 
         "type": "tubo_probabile"
     }, 
     "12": {
-        "confidence": 0.778, 
+        "confidence": 0.752, 
         "type_votes": {
-            "boa_probabile": 75.5, 
-            "tubo_probabile": 0.0
+            "boa_probabile": 134.52999999999992, 
+            "tubo_probabile": 1.75
         }, 
-        "obs_count": 97, 
-        "lon": 10.475519288778596, 
-        "lat": 43.70640393510853, 
-        "type": "boa_probabile"
-    }, 
-    "13": {
-        "confidence": 0.769, 
-        "type_votes": {
-            "boa_probabile": 46.16999999999999, 
-            "tubo_probabile": 0.44000000000000006
-        }, 
-        "obs_count": 60, 
-        "lon": 10.475670793776565, 
-        "lat": 43.706404550678975, 
+        "obs_count": 179, 
+        "lon": 10.475241201995274, 
+        "lat": 43.70662466668768, 
         "type": "boa_probabile"
     }, 
     "14": {
-        "confidence": 0.108, 
+        "confidence": 0.348, 
         "type_votes": {
-            "boa_probabile": 2.3599999999999994, 
-            "tubo_probabile": 5.31
+            "tubo_probabile": 31.310000000000006
         }, 
-        "obs_count": 49, 
-        "lon": 10.47558330114434, 
-        "lat": 43.70635587279709, 
+        "obs_count": 90, 
+        "lon": 10.475166732619822, 
+        "lat": 43.70654628553985, 
         "type": "tubo_probabile"
     }
 }
