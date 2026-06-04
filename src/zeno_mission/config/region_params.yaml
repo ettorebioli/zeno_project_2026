@@ -1,21 +1,11 @@
 origin:
   coordinates:
-    latitude:   43.7062829
-    longitude:  10.4750928
-    depth:      0.0
+    
 
 # vertici poligono w.r.t the fixed frame
 polygon_vertices:
   original:
-    - [25.421, 0.000]
-    - [52.998, 11.131]
-    - [49.331, 30.588]
-    - [9.266, 54.800]
-    - [0.000, 40.752]
+   
 
   restricted:
-    - [26.229, 2.483]
-    - [50.729, 12.372]
-    - [47.531, 29.339]
-    - [9.877, 52.094]
-    - [2.376, 40.722]
+  
