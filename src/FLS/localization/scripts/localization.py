@@ -160,15 +160,17 @@ class FLSLocalizationNode:
         return inside
 
     def nav_callback(self, msg):
-        if msg.initialized:
-            stamp_sec = msg.header.stamp.to_sec()
-            nav_state = {
-                'lat': msg.position.latitude,
-                'lon': msg.position.longitude,
-                'yaw': msg.orientation.yaw
-            }
-            with self.buffer_lock:
-                self.nav_buffer.append((stamp_sec, nav_state))
+            if msg.initialized:
+                stamp_sec = msg.header.stamp.to_sec()
+                nav_state = {
+                    'lat': msg.position.latitude,
+                    'lon': msg.position.longitude,
+                    'yaw': msg.orientation.yaw,
+                    'pitch': msg.orientation.pitch, # <-- Aggiunto
+                    'roll': msg.orientation.roll    # <-- Aggiunto
+                }
+                with self.buffer_lock:
+                    self.nav_buffer.append((stamp_sec, nav_state))
 
     def target_callback(self, msg):
         try:
@@ -223,9 +225,28 @@ class FLSLocalizationNode:
             else:
                 return
 
+            # Estraiamo gli angoli di Eulero dal nav_state
             yaw = nav_state['yaw']
-            X_ned = X_body * math.cos(yaw) - Y_body * math.sin(yaw)
-            Y_ned = X_body * math.sin(yaw) + Y_body * math.cos(yaw)
+            pitch = nav_state.get('pitch', 0.0) # Usa 0.0 come fallback se non è presente
+            roll = nav_state.get('roll', 0.0)
+            Z_body = h_sonar
+           
+            # Pre-calcoliamo seni e coseni per efficienza
+            cy = math.cos(yaw)
+            sy = math.sin(yaw)
+            cp = math.cos(pitch)
+            sp = math.sin(pitch)
+            cr = math.cos(roll)
+            sr = math.sin(roll)
+
+            # Applichiamo la matrice di rotazione completa R_b^n (Body to NED)
+            X_ned = X_body * (cy * cp) + \
+                    Y_body * (cy * sp * sr - sy * cr) + \
+                    Z_body * (cy * sp * cr + sy * sr)
+                    
+            Y_ned = X_body * (sy * cp) + \
+                    Y_body * (sy * sp * sr + cy * cr) + \
+                    Z_body * (sy * sp * cr - cy * sr)
 
             raw_lat, raw_lon = ne2ll((nav_state['lat'], nav_state['lon']), (X_ned, Y_ned))
             raw_type = str(target_data.get('type', 'unknown')).lower()
