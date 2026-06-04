@@ -94,7 +94,7 @@ except Exception as e:
 # ---> RISOLUZIONE DINAMICA PATH SSS <---
 try:
     sss_pkg_path = rp.get_path('sss_package')
-    SSS_FILE = os.path.join(sss_pkg_path, 'results', '9_list_texts', 'SSS_object_list_10.json')
+    SSS_FILE = os.path.join(sss_pkg_path, 'results', '9_list_texts', 'SSS_object_list.json')
 except Exception as e:
     print("[ATTENZIONE] Pacchetto 'sss_package' non trovato. Uso file locale.")
     SSS_FILE = 'final_object_list.json'
