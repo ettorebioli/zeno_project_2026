@@ -3,7 +3,6 @@
     
     <arg name="bag_prefix" default="$(find zeno_mission)/BAG/zeno_phase_$(arg phase)" />
 
-    <include file="$(find zeno_sim_pkg)/launch/zeno.launch" />
 
     <group if="$(eval arg('phase') == 1)">
         <include file="$(find zeno_mission)/launch/zeno_phase1.launch" />

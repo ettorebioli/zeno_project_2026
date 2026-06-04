@@ -1,0 +1,356 @@
+{
+    "final_map": {
+        "11": {
+            "source": "FUSION (Won by FLS)", 
+            "confidence": 0.791, 
+            "original_fls_id": 9, 
+            "original_sss_id": 22, 
+            "type": "boa_probabile", 
+            "obs_count": 122, 
+            "lon": 10.475265478907993, 
+            "lat": 43.706536909008754
+        }, 
+        "10": {
+            "source": "FUSION (Won by FLS)", 
+            "confidence": 0.697, 
+            "original_fls_id": 7, 
+            "original_sss_id": 2, 
+            "type": "boa_probabile", 
+            "obs_count": 132, 
+            "lon": 10.475425410104881, 
+            "lat": 43.70659576414295
+        }, 
+        "12": {
+            "source": "FUSION (Won by FLS)", 
+            "confidence": 0.409, 
+            "original_fls_id": 8, 
+            "original_sss_id": 6, 
+            "type": "tubo_probabile", 
+            "obs_count": 75, 
+            "lon": 10.475362695196182, 
+            "lat": 43.706474860226635
+        }, 
+        "1": {
+            "source": "FUSION (Won by FLS)", 
+            "confidence": 0.429, 
+            "original_fls_id": 11, 
+            "original_sss_id": 16, 
+            "type": "tubo_probabile", 
+            "obs_count": 63, 
+            "lon": 10.47532511881025, 
+            "lat": 43.70669870813951
+        }, 
+        "3": {
+            "source": "FUSION (Won by FLS)", 
+            "confidence": 0.752, 
+            "original_fls_id": 12, 
+            "original_sss_id": 18, 
+            "type": "boa_probabile", 
+            "obs_count": 179, 
+            "lon": 10.475241201995274, 
+            "lat": 43.70662466668768
+        }, 
+        "2": {
+            "source": "FUSION (Won by SSS)", 
+            "confidence": 0.556, 
+            "original_fls_id": 10, 
+            "original_sss_id": 4, 
+            "type": "tubo_probabile", 
+            "obs_count": 9, 
+            "lon": 10.475329263126172, 
+            "lat": 43.7065724818075
+        }, 
+        "5": {
+            "source": "FUSION (Won by FLS)", 
+            "confidence": 0.35, 
+            "original_fls_id": 1, 
+            "original_sss_id": 12, 
+            "type": "tubo_probabile", 
+            "obs_count": 132, 
+            "lon": 10.475512261683484, 
+            "lat": 43.70655539984416
+        }, 
+        "4": {
+            "source": "FUSION (Won by FLS)", 
+            "confidence": 0.348, 
+            "original_fls_id": 14, 
+            "original_sss_id": 20, 
+            "type": "tubo_probabile", 
+            "obs_count": 90, 
+            "lon": 10.475166732619822, 
+            "lat": 43.70654628553985
+        }, 
+        "7": {
+            "source": "FUSION (Won by FLS)", 
+            "confidence": 0.84, 
+            "original_fls_id": 2, 
+            "original_sss_id": 5, 
+            "type": "boa_probabile", 
+            "obs_count": 170, 
+            "lon": 10.475457587694935, 
+            "lat": 43.706519603349264
+        }, 
+        "6": {
+            "source": "FUSION (Won by SSS)", 
+            "confidence": 0.821, 
+            "original_fls_id": 3, 
+            "original_sss_id": 9, 
+            "type": "tubo_probabile", 
+            "obs_count": 4, 
+            "lon": 10.475578454597002, 
+            "lat": 43.7064892618985
+        }, 
+        "9": {
+            "source": "FUSION (Won by FLS)", 
+            "confidence": 0.714, 
+            "original_fls_id": 4, 
+            "original_sss_id": 7, 
+            "type": "boa_probabile", 
+            "obs_count": 98, 
+            "lon": 10.475503682998118, 
+            "lat": 43.706388775159766
+        }, 
+        "8": {
+            "source": "FUSION (Won by FLS)", 
+            "confidence": 0.852, 
+            "original_fls_id": 5, 
+            "original_sss_id": 8, 
+            "type": "boa_probabile", 
+            "obs_count": 49, 
+            "lon": 10.475661693263174, 
+            "lat": 43.70641414896441
+        }
+    }, 
+    "fusion_diagnostics": {
+        "isolated_targets": [
+            {
+                "final_id": null, 
+                "type": "boa_probabile", 
+                "status": "DISCARDED", 
+                "sensor": "SSS", 
+                "id": 21
+            }, 
+            {
+                "final_id": null, 
+                "type": "tubo_probabile", 
+                "status": "DISCARDED", 
+                "sensor": "SSS", 
+                "id": 1
+            }, 
+            {
+                "final_id": null, 
+                "type": "boa_probabile", 
+                "status": "DISCARDED", 
+                "sensor": "SSS", 
+                "id": 3
+            }, 
+            {
+                "final_id": null, 
+                "type": "tubo_probabile", 
+                "status": "DISCARDED", 
+                "sensor": "SSS", 
+                "id": 11
+            }, 
+            {
+                "final_id": null, 
+                "type": "boa_probabile", 
+                "status": "DISCARDED", 
+                "sensor": "SSS", 
+                "id": 10
+            }, 
+            {
+                "final_id": null, 
+                "type": "boa_probabile", 
+                "status": "DISCARDED", 
+                "sensor": "SSS", 
+                "id": 13
+            }, 
+            {
+                "final_id": null, 
+                "type": "boa_probabile", 
+                "status": "DISCARDED", 
+                "sensor": "SSS", 
+                "id": 15
+            }, 
+            {
+                "final_id": null, 
+                "type": "boa_probabile", 
+                "status": "DISCARDED", 
+                "sensor": "SSS", 
+                "id": 14
+            }, 
+            {
+                "final_id": null, 
+                "type": "boa_probabile", 
+                "status": "DISCARDED", 
+                "sensor": "SSS", 
+                "id": 17
+            }, 
+            {
+                "final_id": null, 
+                "type": "tubo_probabile", 
+                "status": "DISCARDED", 
+                "sensor": "SSS", 
+                "id": 19
+            }
+        ], 
+        "matched_targets": [
+            {
+                "fls_type": "tubo_probabile", 
+                "final_id": 1, 
+                "distance_m": 1.361, 
+                "sss_obs": 3.0, 
+                "fls_conf": 0.429, 
+                "sss_id": 16, 
+                "sss_conf": 0.809, 
+                "winner": "FLS", 
+                "fls_id": 11, 
+                "sss_type": "tubo_probabile", 
+                "fls_obs": 63.0
+            }, 
+            {
+                "fls_type": "tubo_probabile", 
+                "final_id": 2, 
+                "distance_m": 1.117, 
+                "sss_obs": 9.0, 
+                "fls_conf": 0.224, 
+                "sss_id": 4, 
+                "sss_conf": 0.556, 
+                "winner": "SSS", 
+                "fls_id": 10, 
+                "sss_type": "tubo_probabile", 
+                "fls_obs": 105.0
+            }, 
+            {
+                "fls_type": "boa_probabile", 
+                "final_id": 3, 
+                "distance_m": 3.303, 
+                "sss_obs": 4.0, 
+                "fls_conf": 0.752, 
+                "sss_id": 18, 
+                "sss_conf": 0.714, 
+                "winner": "FLS", 
+                "fls_id": 12, 
+                "sss_type": "tubo_probabile", 
+                "fls_obs": 179.0
+            }, 
+            {
+                "fls_type": "tubo_probabile", 
+                "final_id": 4, 
+                "distance_m": 2.214, 
+                "sss_obs": 5.0, 
+                "fls_conf": 0.348, 
+                "sss_id": 20, 
+                "sss_conf": 0.714, 
+                "winner": "FLS", 
+                "fls_id": 14, 
+                "sss_type": "tubo_probabile", 
+                "fls_obs": 90.0
+            }, 
+            {
+                "fls_type": "tubo_probabile", 
+                "final_id": 5, 
+                "distance_m": 1.914, 
+                "sss_obs": 4.0, 
+                "fls_conf": 0.35, 
+                "sss_id": 12, 
+                "sss_conf": 0.642, 
+                "winner": "FLS", 
+                "fls_id": 1, 
+                "sss_type": "tubo_probabile", 
+                "fls_obs": 132.0
+            }, 
+            {
+                "fls_type": "tubo_probabile", 
+                "final_id": 6, 
+                "distance_m": 2.127, 
+                "sss_obs": 4.0, 
+                "fls_conf": 0.052, 
+                "sss_id": 9, 
+                "sss_conf": 0.821, 
+                "winner": "SSS", 
+                "fls_id": 3, 
+                "sss_type": "tubo_probabile", 
+                "fls_obs": 81.0
+            }, 
+            {
+                "fls_type": "boa_probabile", 
+                "final_id": 7, 
+                "distance_m": 2.069, 
+                "sss_obs": 4.0, 
+                "fls_conf": 0.84, 
+                "sss_id": 5, 
+                "sss_conf": 0.893, 
+                "winner": "FLS", 
+                "fls_id": 2, 
+                "sss_type": "tubo_probabile", 
+                "fls_obs": 170.0
+            }, 
+            {
+                "fls_type": "boa_probabile", 
+                "final_id": 8, 
+                "distance_m": 0.501, 
+                "sss_obs": 2.0, 
+                "fls_conf": 0.852, 
+                "sss_id": 8, 
+                "sss_conf": 0.714, 
+                "winner": "FLS", 
+                "fls_id": 5, 
+                "sss_type": "tubo_probabile", 
+                "fls_obs": 49.0
+            }, 
+            {
+                "fls_type": "boa_probabile", 
+                "final_id": 9, 
+                "distance_m": 2.205, 
+                "sss_obs": 3.0, 
+                "fls_conf": 0.714, 
+                "sss_id": 7, 
+                "sss_conf": 0.762, 
+                "winner": "FLS", 
+                "fls_id": 4, 
+                "sss_type": "boa_probabile", 
+                "fls_obs": 98.0
+            }, 
+            {
+                "fls_type": "boa_probabile", 
+                "final_id": 10, 
+                "distance_m": 2.726, 
+                "sss_obs": 5.0, 
+                "fls_conf": 0.697, 
+                "sss_id": 2, 
+                "sss_conf": 0.771, 
+                "winner": "FLS", 
+                "fls_id": 7, 
+                "sss_type": "boa_probabile", 
+                "fls_obs": 132.0
+            }, 
+            {
+                "fls_type": "boa_probabile", 
+                "final_id": 11, 
+                "distance_m": 2.216, 
+                "sss_obs": 1.0, 
+                "fls_conf": 0.791, 
+                "sss_id": 22, 
+                "sss_conf": 0.857, 
+                "winner": "FLS", 
+                "fls_id": 9, 
+                "sss_type": "tubo_probabile", 
+                "fls_obs": 122.0
+            }, 
+            {
+                "fls_type": "tubo_probabile", 
+                "final_id": 12, 
+                "distance_m": 3.379, 
+                "sss_obs": 4.0, 
+                "fls_conf": 0.409, 
+                "sss_id": 6, 
+                "sss_conf": 0.571, 
+                "winner": "FLS", 
+                "fls_id": 8, 
+                "sss_type": "tubo_probabile", 
+                "fls_obs": 75.0
+            }
+        ]
+    }
+}

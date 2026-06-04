@@ -36,29 +36,28 @@ class FLSLocalizationNode:
         # Memoria della mappa
         self.global_targets = {}
         self.next_global_id = 1
+        
+        # Mantenuto a 5.5 come richiesto
         self.CLUSTER_RADIUS_M = 5.5
         rp = rospkg.RosPack()  
 
-        # --- CARTELLA DI OUTPUT ESPLICITA NELLA HOME ---
+        # --- CARTELLA DI OUTPUT ESPLICITA ---
         try:
-            # Trova dinamicamente la cartella del tuo pacchetto 
-            # ATTENZIONE: Sostituisci 'nome_del_tuo_pacchetto' con il vero nome (es. 'localization_pkg' o 'marta_guide')
             pkg_path = rp.get_path('localization')
-            
-            # Crea una sottocartella chiamata "output_mappe" dentro il tuo pacchetto
             self.output_dir = os.path.join(pkg_path, "output_mappe")
-            
         except Exception as e:
-            # Fallback di emergenza se il pacchetto non viene trovato
             rospy.logwarn("Pacchetto non trovato, salvataggio di emergenza nella Home. Errore: {}".format(e))
             self.output_dir = os.path.expanduser("~/mappa_target")
 
-        # Crea la cartella se non esiste
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
             
         self.log_file_path = os.path.join(self.output_dir, "localized_targets_log.txt")
         self.final_map_path = os.path.join(self.output_dir, "final_target_map.json")
+        
+        # ---> AGGIUNTA DEI PATH YAML <---
+        self.targets_yaml_path = os.path.join(self.output_dir, "targets_fls.yaml")
+        self.obstacles_yaml_path = os.path.join(self.output_dir, "obstacle_fls.yaml")
         
         with open(self.log_file_path, "w") as f:
             f.write("=== LOG TARGET LOCALIZZATI ===\n\n")
@@ -68,8 +67,6 @@ class FLSLocalizationNode:
         rospy.Subscriber('/perception/target_json', String, self.target_callback)
         
         self.pub_localized = rospy.Publisher('/perception/target_localized_json', String, queue_size=10)
-        
-        # NUOVO TOPIC: Pubblica l'intera mappa pulita costantemente (latch=True mantiene in memoria l'ultimo messaggio)
         self.pub_global_map = rospy.Publisher('/perception/global_map_json', String, queue_size=1, latch=True)
 
         rospy.on_shutdown(self.save_final_target_list)
@@ -78,22 +75,43 @@ class FLSLocalizationNode:
         rospy.loginfo("I file verranno salvati in modo sicuro in: {}".format(self.output_dir))
 
     def save_final_target_list(self):
-        """Salva la mappa su file JSON e fa un'ultima pubblicazione sul topic prima di morire."""
-        rospy.loginfo("Generazione della mappa finale in: {}".format(self.final_map_path))
+        """Salva la mappa su file JSON e YAML e fa un'ultima pubblicazione sul topic prima di morire."""
+        rospy.loginfo("Generazione delle mappe finali in: {}".format(self.output_dir))
         try:
-            # --- MODIFICA: Filtriamo la mappa prima di scriverla nel JSON ---
-            MIN_OBS_COUNT = 35 # Consiglio di tenerlo a 35 per non perdere i target veri!
+            # 1. Filtriamo la mappa
+            MIN_OBS_COUNT = 35 
             confirmed_targets = {}
             
             for t_id, t_data in self.global_targets.items():
                 if t_data['obs_count'] >= MIN_OBS_COUNT:
                     confirmed_targets[t_id] = t_data
 
+            # 2. Salviamo il JSON
             with open(self.final_map_path, 'w') as f:
-                # Ora salviamo solo il dizionario pulito!
                 json.dump(confirmed_targets, f, indent=4)
                 
-            rospy.loginfo("Mappa salvata con successo! Trovati {} target confermati.".format(len(confirmed_targets)))
+            # 3. Prepariamo le strutture a lista semplice per i file YAML
+            targets_data = {"targets": []}
+            obstacles_data = {"obstacles": []}
+
+            for t_id, info in confirmed_targets.items():
+                if "boa" in info["type"]:
+                    # Formato puro per i Target: [lat, lon]
+                    targets_data["targets"].append([info["lat"], info["lon"]])
+                elif "tubo" in info["type"]:
+                    # Formato puro per gli Ostacoli: [lat, lon, 2.5]
+                    obstacles_data["obstacles"].append([info["lat"], info["lon"], 2.5])
+
+            # 4. Scriviamo i file YAML per il Path Planning (default_flow_style=None per le liste in linea)
+            with open(self.targets_yaml_path, 'w') as f:
+                yaml.dump(targets_data, f, default_flow_style=None)
+
+            with open(self.obstacles_yaml_path, 'w') as f:
+                yaml.dump(obstacles_data, f, default_flow_style=None)
+                
+            rospy.loginfo("Mappe salvate con successo! Trovate {} Boe e {} Tubi.".format(
+                len(targets_data["targets"]), len(obstacles_data["obstacles"])
+            ))
             
             # Un'ultima pubblicazione di sicurezza sul topic prima di chiudere
             map_msg = String()
@@ -102,7 +120,6 @@ class FLSLocalizationNode:
             
         except Exception as e:
             rospy.logerr("Errore nel salvataggio: {}".format(e))
-
 
     def load_safe_zone(self):
         try:
@@ -113,15 +130,11 @@ class FLSLocalizationNode:
             with open(yaml_file, 'r') as f:
                 data = yaml.safe_load(f)
                 
-            # ---> MODIFICA: Ora estraiamo il poligono 'original' <---
             vertices_ned = data['polygon_vertices']['original']
-            
-            # SALVIAMO L'ORIGINE PER LE CONVERSIONI!
             lat_o = data['origin']['coordinates']['latitude']
             lon_o = data['origin']['coordinates']['longitude']
             self.map_origin = (lat_o, lon_o)
             
-            # ---> MODIFICA: Aggiornato anche il log per coerenza visiva a terminale <---
             rospy.loginfo("Area di gara ORIGINALE caricata con successo da YAML.")
             return vertices_ned
             
@@ -186,49 +199,20 @@ class FLSLocalizationNode:
 
             # --- SELEZIONE DINAMICA DEL PUNTO DI CONTATTO ACUSTICO ---
             if "tubo" in raw_type:
-                # Per il tubo inclinato, il centroide è geometricamente stabile e cade sempre sul corpo
                 u_t = float(center[0])
                 v_t = float(center[1])
-                
-                # Regoliamo l'altezza stimata: il centroide del tubo si trova a circa 
-                # metà del suo diametro (altezza totale 0.75m -> centro a ~0.37m)
                 H_TARGET_EST = 0.37 
                 
             elif "boa" in raw_type:
-                # Per la boa, il centro del lato inferiore della bbox prende la base di cemento
                 x1, y1, ew, eh = bbox
                 u_t = x1 + (ew / 2.0)
                 v_t = float(y1 + eh)
-                
-                # La base poggia sul fondo, il centro di riflessione del blocco è a ~0.35m
                 H_TARGET_EST = 0.35
-
-            # x1, y1, ew, eh = bbox
-            # u_t = x1 + (ew / 2.0)
-            # v_t = float(y1 + eh)
-
-            # center = target_data.get('center_px')
-            # if center is None:
-            #     return
-
-            # u_t = float(center[0])
-            # v_t = float(center[1])
 
             X_slant = (self.V_0 - v_t) * self.S_F
             Y_slant = (u_t - self.U_0) * self.S_F
             R_slant = math.sqrt(X_slant**2 + Y_slant**2)
             
-            # raw_type = str(target_data.get('type', 'unknown')).lower()
-
-            # # --- CORREZIONE DI PARALLASSE DINAMICA ---
-            # if "tubo" in raw_type:
-            #     # Il tubo è alto 0.75m sul fondale
-            #     H_TARGET_EST = 0.7 
-            # elif "boa" in raw_type:
-            #     # La sfera della boa si trova a oltre 1.5m dal fondale
-            #     H_TARGET_EST = 1.8
-
-            # Calcoliamo l'h relativo tra sonar e punto d'impatto
             h_sonar = (self.NOMINAL_ALTITUDE - self.OFFSET_Z_SONAR) - H_TARGET_EST
             
             if R_slant > h_sonar:
@@ -245,23 +229,17 @@ class FLSLocalizationNode:
 
             raw_lat, raw_lon = ne2ll((nav_state['lat'], nav_state['lon']), (X_ned, Y_ned))
             raw_type = str(target_data.get('type', 'unknown')).lower()
-            raw_conf = target_data.get('confidence', 0.5)
+            raw_conf = target_data.get('confidence', 0.0)
             current_range = math.sqrt(X_body**2 + Y_body**2)
 
             # --------------------------------------------------------
-            # GEOFENCING NED: IL TARGET È DENTRO L'AREA DI GARA?
+            # GEOFENCING NED
             # --------------------------------------------------------
             if self.safe_zone_vertices is not None and hasattr(self, 'map_origin'):
-                # Convertiamo le cordinate assolute in NED rispetto all'origine della mappa!
                 tgt_n, tgt_e = ll2ne(self.map_origin, (raw_lat, raw_lon))
-                
-                # yaml_vertices sono [North, East]. Usiamo tgt_n come X e tgt_e come Y
                 if not self.point_in_polygon(tgt_n, tgt_e, self.safe_zone_vertices):
                     return
             # --------------------------------------------------------
-
-            raw_type = str(target_data.get('type', 'unknown')).lower()
-            raw_conf = target_data.get('confidence', 0.0)
 
             # --- LOGICA DEL CLUSTERING ---
             best_global_id = None
@@ -273,35 +251,6 @@ class FLSLocalizationNode:
                     min_dist = dist
                     best_global_id = gid
 
-            # if best_global_id is not None:
-            #     g_tgt = self.global_targets[best_global_id]
-            #     # --- MODIFICA: Filtro Esponenziale (EMA) ---
-            #     # ALPHA = 0.2 significa: la nuova misura pesa il 20%, la vecchia storia l'80%
-            #     # Il baricentro sarà fluido ma non resterà "bloccato" da 1000 frame vecchi sballati.
-            #     ALPHA = 0.2 
-    
-            #     g_tgt['lat'] = (1 - ALPHA) * g_tgt['lat'] + ALPHA * raw_lat
-            #     g_tgt['lon'] = (1 - ALPHA) * g_tgt['lon'] + ALPHA * raw_lon
-    
-            #     g_tgt['obs_count'] += 1
-                
-            #     # Se lo vediamo da più vicino, aggiorniamo la classe in cui crediamo
-            #     if current_range < g_tgt['min_range']:
-            #         g_tgt['type'] = raw_type
-            #         g_tgt['confidence'] = raw_conf
-            #         g_tgt['min_range'] = current_range
-            # else:
-            #     best_global_id = self.next_global_id
-            #     self.next_global_id += 1
-            #     self.global_targets[best_global_id] = {
-            #         'lat': raw_lat,
-            #         'lon': raw_lon,
-            #         'type': raw_type,
-            #         'confidence': raw_conf,
-            #         'min_range': current_range,
-            #         'obs_count': 1
-            #     }
-                    
             if best_global_id is not None:
                 g_tgt = self.global_targets[best_global_id]
                 ALPHA = 0.2 
@@ -311,17 +260,12 @@ class FLSLocalizationNode:
     
                 g_tgt['obs_count'] += 1
                 
-                # --- NUOVA LOGICA: VOTAZIONE DELLA CLASSE ---
-                # Aggiungiamo i voti pesati sulla confidenza
                 if raw_type in g_tgt['type_votes']:
                     g_tgt['type_votes'][raw_type] += float(raw_conf)
                 else:
                     g_tgt['type_votes'][raw_type] = float(raw_conf)
                     
-                # La classe definitiva è quella che ha accumulato più punti
                 g_tgt['type'] = max(g_tgt['type_votes'], key=g_tgt['type_votes'].get)
-                
-                # La confidenza finale diventa una media ponderata
                 g_tgt['confidence'] = round(g_tgt['type_votes'][g_tgt['type']] / g_tgt['obs_count'], 3)
                 
             else:
@@ -333,10 +277,9 @@ class FLSLocalizationNode:
                     'type': raw_type,
                     'confidence': raw_conf,
                     'obs_count': 1,
-                    'type_votes': {raw_type: float(raw_conf)} # <- Inizializziamo il dizionario dei voti
+                    'type_votes': {raw_type: float(raw_conf)} 
                 }
 
-            # 1. Pubblichiamo il target singolo aggiornato (come prima)
             target_data['target_id'] = best_global_id
             target_data['target_lat'] = self.global_targets[best_global_id]['lat']
             target_data['target_lon'] = self.global_targets[best_global_id]['lon']
@@ -346,7 +289,7 @@ class FLSLocalizationNode:
             out_msg.data = json.dumps(target_data)
             self.pub_localized.publish(out_msg)
 
-            # ---> NUOVA LOGICA: TRACK CONFIRMATION <---
+            # ---> TRACK CONFIRMATION E PUBBLICAZIONE <---
             MIN_OBS_COUNT = 35
             confirmed_targets = {}
             
@@ -354,12 +297,10 @@ class FLSLocalizationNode:
                 if t_data['obs_count'] >= MIN_OBS_COUNT:
                     confirmed_targets[t_id] = t_data
 
-            # 2. PUBBLICHIAMO L'INTERA MAPPA GLOBALE (Il dizionario pulito!)
             map_msg = String()
             map_msg.data = json.dumps(confirmed_targets)
             self.pub_global_map.publish(map_msg)
 
-            # Salvataggio log continuo (nella Home)
             try:
                 with open(self.log_file_path, "a") as f:
                     f.write(json.dumps(target_data, indent=4) + "\n" + "-"*50 + "\n")
