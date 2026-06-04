@@ -427,15 +427,15 @@ def fls_callback(msg):
             msg_out.data = json.dumps(target_data)
             pub_json.publish(msg_out)
 
-    # 5. Salvataggio Immagini nelle cartelle separate
-    dir_binary = os.path.join(OUTPUT_DIR, "frames_binary")
-    dir_candidates = os.path.join(OUTPUT_DIR, "frames_candidates")
+    # # 5. Salvataggio Immagini nelle cartelle separate
+    # dir_binary = os.path.join(OUTPUT_DIR, "frames_binary")
+    # dir_candidates = os.path.join(OUTPUT_DIR, "frames_candidates")
     
-    ensure_dir(dir_binary)
-    ensure_dir(dir_candidates)
+    # ensure_dir(dir_binary)
+    # ensure_dir(dir_candidates)
     
-    cv2.imwrite(os.path.join(dir_binary, "frame_{:06d}_binary.jpg".format(frame_count)), binary)
-    cv2.imwrite(os.path.join(dir_candidates, "frame_{:06d}_candidates.jpg".format(frame_count)), out_img)
+    # cv2.imwrite(os.path.join(dir_binary, "frame_{:06d}_binary.jpg".format(frame_count)), binary)
+    # cv2.imwrite(os.path.join(dir_candidates, "frame_{:06d}_candidates.jpg".format(frame_count)), out_img)
 
     # 6. Pubblicazione su RViz
     try:

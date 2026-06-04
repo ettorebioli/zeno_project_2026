@@ -6,6 +6,7 @@ import json
 import os
 import rospkg
 import yaml
+import csv
 from geodetic_functions import ll2ne
 
 # ============================================================
@@ -75,20 +76,25 @@ print("--- INIZIO CROSS-CHECK SENSORI ---")
 
 rp = rospkg.RosPack()
 
+try:
+    zeno_mission_pkg_path = rp.get_path('zeno_mission')
+    config_path = os.path.join(zeno_mission_pkg_path, "config")
+except Exception as e:
+    print("[ATTENZIONE] Pacchetto 'zeno_mission' non trovato. Uso cartella corrente.")
+    config_path = '.'
+
 # ---> RISOLUZIONE DINAMICA PATH FLS <---
 try:
     fls_pkg_path = rp.get_path('localization')
     FLS_FILE = os.path.join(fls_pkg_path, 'output_mappe', 'final_target_map.json')
-    OUTPUT_DIR = os.path.join(fls_pkg_path, 'output_mappe')
 except Exception as e:
     print("[ATTENZIONE] Pacchetto 'localization' non trovato. Uso file locale.")
     FLS_FILE = 'final_target_map.json'
-    OUTPUT_DIR = '.'
 
 # ---> RISOLUZIONE DINAMICA PATH SSS <---
 try:
     sss_pkg_path = rp.get_path('sss_package')
-    SSS_FILE = os.path.join(sss_pkg_path, 'results', '9_list_texts', 'final_object_list.json')
+    SSS_FILE = os.path.join(sss_pkg_path, 'results', '9_list_texts', 'SSS_object_list_10.json')
 except Exception as e:
     print("[ATTENZIONE] Pacchetto 'sss_package' non trovato. Uso file locale.")
     SSS_FILE = 'final_object_list.json'
@@ -232,17 +238,17 @@ for s_id in unmatched_sss:
     merged_list_data["fusion_diagnostics"]["isolated_targets"].append({
         "final_id": None, "sensor": "SSS", "id": int(s_id), "type": sss_data[s_id]['type'], "status": "DISCARDED"
     })
-    # NON incrementiamo next_final_id e NON lo aggiungiamo a final_map
 
 # ============================================================
-# 5. SALVATAGGIO DEI FILE (JSON e YAML)
+# 5. SALVATAGGIO DEI FILE (JSON, YAML e CSV)
 # ============================================================
+
 # 5a. Salvataggio Super File JSON
-merged_file_path = os.path.join(OUTPUT_DIR, 'merged_target_list.json')
+merged_file_path = os.path.join(config_path, 'merged_target_list.json')
 try:
-    with open(merged_file_path, 'w') as f:
+    with open(merged_file_path, 'w') as f:  # <--- CORRETTO QUI
         json.dump(merged_list_data, f, indent=4)
-    print("\n[OK] Super file di fusione salvato in: {}".format(merged_file_path))
+    print("\n[OK] Super file di fusione salvato in: {}".format(merged_file_path)) # <--- CORRETTO QUI
 except Exception as e:
     print("\n[ERRORE] Impossibile salvare il super file: {}".format(e))
 
@@ -252,14 +258,12 @@ obstacles_data = {"obstacles": []}
 
 for final_id, item_data in merged_list_data["final_map"].items():
     if "boa" in item_data["type"]:
-        # Boe: [lat, lon]
         targets_data["targets"].append([item_data["lat"], item_data["lon"]])
     elif "tubo" in item_data["type"]:
-        # Tubi: [lat, lon, 2.5]
         obstacles_data["obstacles"].append([item_data["lat"], item_data["lon"], 2.5])
 
-targets_yaml_path = os.path.join(OUTPUT_DIR, 'targets.yaml')
-obstacles_yaml_path = os.path.join(OUTPUT_DIR, 'obstacles.yaml')
+targets_yaml_path = os.path.join(config_path, 'targets.yaml')
+obstacles_yaml_path = os.path.join(config_path, 'obstacles.yaml')
 
 try:
     with open(targets_yaml_path, 'w') as f:
@@ -269,6 +273,30 @@ try:
         
     print("[OK] Generato {} con {} boe (target).".format(targets_yaml_path, len(targets_data["targets"])))
     print("[OK] Generato {} con {} tubi (ostacoli).".format(obstacles_yaml_path, len(obstacles_data["obstacles"])))
-    print("\nMappa generata con successo! Totale Target Validi: {}".format(len(merged_list_data["final_map"])))
 except Exception as e:
     print("\n[ERRORE] Impossibile salvare i file YAML: {}".format(e))
+
+# 5c. Generazione e Salvataggio CSV (In Italiano)
+csv_file_path = os.path.join(config_path, 'final_map.csv')
+try:
+    with open(csv_file_path, mode='w') as csv_file:
+        writer = csv.writer(csv_file, delimiter=',')
+        
+        # Intestazione in italiano
+        writer.writerow(['nome', 'lat', 'lon'])
+        
+        for final_id, item_data in merged_list_data["final_map"].items():
+            # Mappatura in italiano pulita
+            if "boa" in item_data["type"]:
+                obj_name = "boa"
+            elif "tubo" in item_data["type"]:
+                obj_name = "tubo"
+            else:
+                obj_name = "sconosciuto"
+                
+            writer.writerow([obj_name, item_data["lat"], item_data["lon"]])
+            
+    print("[OK] Generato {} con il riepilogo per l'analisi visiva.".format(csv_file_path))
+    print("\nMappa generata con successo! Totale Target Validi: {}".format(len(merged_list_data["final_map"])))
+except Exception as e:
+    print("\n[ERRORE] Impossibile salvare il file CSV: {}".format(e))
