@@ -7,8 +7,8 @@
 import math
 import os
 import rospkg
-import sys
 import json
+import yaml
 from collections import OrderedDict
 import matplotlib
 matplotlib.use('Agg')
@@ -22,74 +22,19 @@ from geodetic_functions import ne2ll
 
 
 # ============================================================
-# DATI MANUALI PER MAPPA FINALE
+# DATI PER MAPPA FINALE
 # ============================================================
-# Inserire punti come (latitudine, longitudine).
+# inserire coordinate 
 MANUAL_POLYGON_POINTS = []
 MANUAL_REFERENCE_OBJECTS = []
 
-"""
-MANUAL_POLYGON_POINTS = [
+# Conversione tra le classi pubblicate dal classificatore e le etichette usate
+# nella lista finale SSS.
+CLASSIFICATION_TYPES = {
+    'buoy': 'boa_probabile',
+    'tube': 'tubo_probabile'
+}
 
-    # allenamento_7_10
-    (43.7065117, 10.4750928),
-    (43.7062829, 10.4755984),
-    (43.7063663, 10.4757727),
-    (43.7067269, 10.4754723),
-    (43.7067599, 10.4752309),
-    (43.7065117, 10.4750928)
-]
- 
-# inserire oggetti noti del file .csv
-MANUAL_REFERENCE_OBJECTS = [
-    
-    # allenamento_7
-    #{'type': 'boa', 'lat': 43.7065128, 'lon': 10.4752562},
-    #{'type': 'boa', 'lat': 43.7066204, 'lon': 10.4754251},
-    #{'type': 'boa', 'lat': 43.7066514, 'lon': 10.4752405},
-    #{'type': 'boa', 'lat': 43.7064982, 'lon': 10.4754498},
-    #{'type': 'boa', 'lat': 43.7063935, 'lon': 10.4756603},
-    #{'type': 'boa', 'lat': 43.7064003, 'lon': 10.4755168},
-    #{'type': 'tubo', 'lat': 43.706569, 'lon': 10.4753291},
-    #{'type': 'tubo', 'lat': 43.7064866, 'lon': 10.4755785},
-    #{'type': 'tubo', 'lat': 43.7064439, 'lon': 10.4753747},
-    #{'type': 'tubo', 'lat': 43.7066902, 'lon': 10.4753438},
-    #{'type': 'tubo', 'lat': 43.706347, 'lon': 10.4755799},
-    #{'type': 'tubo', 'lat': 43.706568, 'lon': 10.4755034},
-    #{'type': 'tubo', 'lat': 43.7065293, 'lon': 10.4751467}
-
-    # allenamento_10
-    {'type': 'boa', 'lat': 43.7065128, 'lon': 10.4752562},
-    {'type': 'boa', 'lat': 43.7066204, 'lon': 10.4754251},
-    {'type': 'boa', 'lat': 43.7066514, 'lon': 10.4752405},
-    {'type': 'boa', 'lat': 43.7064982, 'lon': 10.4754498},
-    {'type': 'boa', 'lat': 43.7063935, 'lon': 10.4756603},
-    {'type': 'boa', 'lat': 43.7064003, 'lon': 10.4755168},
-    {'type': 'tubo', 'lat': 43.7065690, 'lon': 10.4753291},
-    {'type': 'tubo', 'lat': 43.7064866, 'lon': 10.4755785},
-    {'type': 'tubo', 'lat': 43.7064439, 'lon': 10.4753747},
-    {'type': 'tubo', 'lat': 43.7066902, 'lon': 10.4753438},
-    {'type': 'tubo', 'lat': 43.7063470, 'lon': 10.4755799},
-    {'type': 'tubo', 'lat': 43.7065680, 'lon': 10.4755034},
-    {'type': 'tubo', 'lat': 43.7065293, 'lon': 10.4751467}
-
-    # allenamento_11
-    #{'type': 'boa', 'lat': 43.7065521, 'lon': 10.475344},
-    #{'type': 'boa', 'lat': 43.7065487, 'lon': 10.4754861},
-    #{'type': 'boa', 'lat': 43.7066092, 'lon': 10.4752251},
-    #{'type': 'boa', 'lat': 43.7064783, 'lon': 10.4753157},
-    #{'type': 'boa', 'lat': 43.7063935, 'lon': 10.4756603},
-    #{'type': 'boa', 'lat': 43.7064081, 'lon': 10.4755443},
-    #{'type': 'tubo', 'lat': 43.7065302, 'lon': 10.4752044},
-    #{'type': 'tubo', 'lat': 43.7064376, 'lon': 10.4754303},
-    #{'type': 'tubo', 'lat': 43.7066194, 'lon': 10.4753593},
-    #{'type': 'tubo', 'lat': 43.7066902, 'lon': 10.4753438},
-    #{'type': 'tubo', 'lat': 43.7063213, 'lon': 10.4755879},
-    #{'type': 'tubo', 'lat': 43.7064875, 'lon': 10.4755269},
-    #{'type': 'tubo', 'lat': 43.7066209, 'lon': 10.4754706},
-
-]
-"""
 
 # ============================================================
 # CLASSE PRINCIPALE NODO GEOLOCALIZATION
@@ -120,10 +65,7 @@ class GeolocalizationNode:
         self.list_text_folder = rospy.get_param('~list_text_folder', default_folder)
         if not os.path.exists(self.list_text_folder):
             os.makedirs(self.list_text_folder)
-        self.object_list_json_filename = os.path.join(
-            self.list_text_folder,
-            "SSS_object_list.json"
-        )
+        self.object_list_json_filename = os.path.join(self.list_text_folder, "SSS_object_list.json")
 
         # definire parametri oggetti
         self.list_text_index = 0
@@ -161,9 +103,18 @@ class GeolocalizationNode:
         self.publish_object_list()
         self.save_geolocated_list_text(geolocated_objects, localization_infos)
 
+
+
+# ________________________________________________________________________________________________________________________________
+
+    # ========================================================
+    # LISTA
+    # ========================================================
     def update_complete_object_list(self, geolocated_objects):
+        # Mantiene una lista completa di tutte le detection valide, senza clustering
+        # e senza filtro safezone. Serve come conteggio diagnostico.
         for geolocated_object in geolocated_objects:
-            object_type = self.convert_classification(geolocated_object.object_class)
+            object_type = CLASSIFICATION_TYPES.get(geolocated_object.object_class)
             if object_type is None:
                 continue
 
@@ -178,11 +129,16 @@ class GeolocalizationNode:
             self.next_complete_object_id += 1
 
     def update_object_list(self, geolocated_objects):
+        # Aggiorna la lista finale: filtra fuori safezone e fonde detection vicine
+        # dello stesso tipo nello stesso oggetto osservato piu volte.
         for geolocated_object in geolocated_objects:
-            object_type = self.convert_classification(geolocated_object.object_class)
+            object_type = CLASSIFICATION_TYPES.get(geolocated_object.object_class)
             if object_type is None:
                 continue
-            if not self.is_geolocated_object_inside_safezone(geolocated_object):
+            if not self.is_point_inside_safezone(
+                float(geolocated_object.latitude),
+                float(geolocated_object.longitude)
+            ):
                 rospy.loginfo("[SSS] Detection esclusa dalla lista finale: fuori safezone lat={:.10f} lon={:.10f}".format(
                     float(geolocated_object.latitude),
                     float(geolocated_object.longitude)
@@ -203,14 +159,9 @@ class GeolocalizationNode:
             else:
                 self.update_existing_object(existing_object, geolocated_object)
 
-    def convert_classification(self, object_class):
-        if object_class == 'buoy':
-            return 'boa_probabile'
-        if object_class == 'tube':
-            return 'tubo_probabile'
-        return None
-
     def find_matching_object(self, geolocated_object, object_type):
+        # Cerca l'oggetto gia salvato piu vicino alla nuova detection.
+        # La distanza viene calcolata in metri convertendo lat/lon in Nord-Est locale.
         best_object = None
         best_distance = None
 
@@ -218,7 +169,11 @@ class GeolocalizationNode:
             if stored_object['type'] != object_type:
                 continue
 
-            distance = self.distance_between_objects(stored_object, geolocated_object)
+            north_m, east_m = ll2ne(
+                [stored_object['lat'], stored_object['lon']],
+                [float(geolocated_object.latitude), float(geolocated_object.longitude)]
+            )
+            distance = math.sqrt((north_m * north_m) + (east_m * east_m))
             if distance <= self.object_match_distance_m:
                 if best_distance is None or distance < best_distance:
                     best_distance = distance
@@ -226,49 +181,35 @@ class GeolocalizationNode:
 
         return best_object
 
-    def distance_between_objects(self, stored_object, geolocated_object):
-        north_m, east_m = ll2ne(
-            [stored_object['lat'], stored_object['lon']],
-            [float(geolocated_object.latitude), float(geolocated_object.longitude)]
-        )
-        return math.sqrt((north_m * north_m) + (east_m * east_m))
-
-    def is_geolocated_object_inside_safezone(self, geolocated_object):
-        return self.is_point_inside_safezone(
-            float(geolocated_object.latitude),
-            float(geolocated_object.longitude)
-        )
-
     def is_point_inside_safezone(self, latitude, longitude):
+        # Se la safezone non e disponibile, non blocchiamo le detection.
         if len(self.safezone_polygon_points) < 3:
             return True
 
-        return self.is_point_inside_polygon(
-            float(latitude),
-            float(longitude),
-            self.safezone_polygon_points
-        )
-
-    def is_point_inside_polygon(self, latitude, longitude, polygon_points):
+        # Ray casting in coordinate geografiche: ogni attraversamento del bordo
+        # alterna lo stato dentro/fuori. I punti esattamente sul bordo sono validi.
         inside = False
         point_lat = float(latitude)
         point_lon = float(longitude)
-        previous_lat = float(polygon_points[-1][0])
-        previous_lon = float(polygon_points[-1][1])
+        previous_lat = float(self.safezone_polygon_points[-1][0])
+        previous_lon = float(self.safezone_polygon_points[-1][1])
 
-        for point in polygon_points:
+        for point in self.safezone_polygon_points:
             current_lat = float(point[0])
             current_lon = float(point[1])
 
-            if self.is_point_on_polygon_edge(
-                point_lat,
-                point_lon,
-                previous_lat,
-                previous_lon,
-                current_lat,
-                current_lon
-            ):
-                return True
+            epsilon = 1e-12
+            cross_product = (
+                (point_lon - previous_lon) * (current_lat - previous_lat) -
+                (point_lat - previous_lat) * (current_lon - previous_lon)
+            )
+            if abs(cross_product) <= epsilon:
+                min_lat = min(previous_lat, current_lat) - epsilon
+                max_lat = max(previous_lat, current_lat) + epsilon
+                min_lon = min(previous_lon, current_lon) - epsilon
+                max_lon = max(previous_lon, current_lon) + epsilon
+                if min_lat <= point_lat <= max_lat and min_lon <= point_lon <= max_lon:
+                    return True
 
             crosses_latitude = ((current_lat > point_lat) != (previous_lat > point_lat))
             if crosses_latitude:
@@ -284,26 +225,9 @@ class GeolocalizationNode:
 
         return inside
 
-    def is_point_on_polygon_edge(self, point_lat, point_lon, start_lat, start_lon, end_lat, end_lon):
-        epsilon = 1e-12
-        cross_product = (
-            (point_lon - start_lon) * (end_lat - start_lat) -
-            (point_lat - start_lat) * (end_lon - start_lon)
-        )
-        if abs(cross_product) > epsilon:
-            return False
-
-        min_lat = min(start_lat, end_lat) - epsilon
-        max_lat = max(start_lat, end_lat) + epsilon
-        min_lon = min(start_lon, end_lon) - epsilon
-        max_lon = max(start_lon, end_lon) + epsilon
-
-        return (
-            min_lat <= point_lat <= max_lat and
-            min_lon <= point_lon <= max_lon
-        )
-
     def update_existing_object(self, stored_object, geolocated_object):
+        # Media incrementale: aggiorna posizione e confidenza senza conservare
+        # tutte le detection precedenti dell'oggetto.
         old_count = int(stored_object['obs_count'])
         new_count = old_count + 1
 
@@ -330,6 +254,8 @@ class GeolocalizationNode:
         self.save_detection_map()
 
     def build_object_list_output(self):
+        # Costruisce il JSON pubblicato e salvato su file mantenendo un ordine stabile
+        # dei campi per rendere piu leggibili i risultati.
         output = OrderedDict()
         for stored_object in self.object_list:
             output[str(stored_object['id'])] = OrderedDict([
@@ -338,19 +264,6 @@ class GeolocalizationNode:
                 ('lon', float(stored_object['lon'])),
                 ('lat', float(stored_object['lat'])),
                 ('type', stored_object['type'])
-            ])
-
-        return output
-
-    def build_complete_object_list_output(self):
-        output = OrderedDict()
-        for complete_object in self.complete_object_list:
-            output[str(complete_object['id'])] = OrderedDict([
-                ('confidence', round(float(complete_object['confidence']), 3)),
-                ('obs_count', int(complete_object['obs_count'])),
-                ('lon', float(complete_object['lon'])),
-                ('lat', float(complete_object['lat'])),
-                ('type', complete_object['type'])
             ])
 
         return output
@@ -372,6 +285,8 @@ class GeolocalizationNode:
             ))
 
     def normalize_map_object_type(self, object_type):
+        # Uniforma nomi italiani/inglesi e classi probabili prima di separare
+        # boe e tubi nella mappa finale.
         object_type = str(object_type).strip().lower()
         if object_type in ['boa', 'buoy', 'boa_probabile', 'buoy_probabile']:
             return 'boa'
@@ -397,6 +312,12 @@ class GeolocalizationNode:
 
         return boas, tubos
 
+
+# ________________________________________________________________________________________________________________________________
+
+    # ========================================================
+    # MAPPA
+    # ========================================================
     def plot_map_objects(self, ax, objects, color, marker, label, label_ids=False, facecolors=None):
         if len(objects) == 0:
             return
@@ -431,39 +352,39 @@ class GeolocalizationNode:
                 )
 
     def load_safezone_polygon_points(self):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        file_name = os.path.join(script_dir, "safezone.txt")
         polygon_points = []
 
-        if not os.path.exists(file_name):
-            rospy.logwarn("[SSS] File safezone non trovato: {}".format(file_name))
-            return polygon_points
-
         try:
-            with open(file_name, 'r') as safezone_file:
-                for line_number, line in enumerate(safezone_file, 1):
-                    clean_line = line.strip()
-                    if clean_line == '' or clean_line.startswith('#'):
-                        continue
+            # Stessa procedura usata da FLS: rospkg trova il pacchetto zeno_mission,
+            # poi leggiamo i vertici NED del poligono da region_params.yaml.
+            rospack = rospkg.RosPack()
+            pkg_path = rospack.get_path('zeno_mission')
+            yaml_file = os.path.join(pkg_path, 'config', 'region_params.yaml')
 
-                    parts = clean_line.split(',')
-                    if len(parts) != 2:
-                        rospy.logwarn("[SSS] Riga safezone ignorata {}: {}".format(line_number, line.strip()))
-                        continue
+            with open(yaml_file, 'r') as safezone_file:
+                data = yaml.safe_load(safezone_file)
 
-                    try:
-                        longitude = float(parts[0].strip())
-                        latitude = float(parts[1].strip())
-                        polygon_points.append((latitude, longitude))
-                    except ValueError:
-                        rospy.logwarn("[SSS] Riga safezone non numerica ignorata {}: {}".format(
-                            line_number,
-                            line.strip()
-                        ))
+            origin = data['origin']['coordinates']
+            map_origin = (
+                float(origin['latitude']),
+                float(origin['longitude'])
+            )
+            vertices_ned = data['polygon_vertices']['original']
 
+            # SSS lavora e disegna in lat/lon, quindi i vertici [North, East]
+            # vengono convertiti rispetto all'origine della mappa.
+            for vertex in vertices_ned:
+                north = float(vertex[0])
+                east = float(vertex[1])
+                latitude, longitude = ne2ll(map_origin, (north, east))
+                polygon_points.append((float(latitude), float(longitude)))
+
+            rospy.loginfo("[SSS] Safezone caricata da region_params.yaml con {} vertici".format(
+                len(polygon_points)
+            ))
             return polygon_points
-        except IOError as exc:
-            rospy.logwarn("[SSS] Impossibile leggere safezone: {} ({})".format(file_name, exc))
+        except Exception as exc:
+            rospy.logwarn("[SSS] Impossibile leggere safezone da region_params.yaml: {}".format(exc))
             return []
 
     def plot_polygon_points(self, ax, polygon_points, color, label):
@@ -476,47 +397,8 @@ class GeolocalizationNode:
         polygon_lons.append(float(polygon_points[0][1]))
         ax.plot(polygon_lons, polygon_lats, color=color, linewidth=1.8, label=label, zorder=2)
 
-    def collect_map_axis_points(self, object_groups, polygon_groups):
-        axis_points = []
-
-        for object_group in object_groups:
-            for map_object in object_group:
-                axis_points.append((float(map_object['lat']), float(map_object['lon'])))
-
-        for polygon_group in polygon_groups:
-            for point in polygon_group:
-                axis_points.append((float(point[0]), float(point[1])))
-
-        return axis_points
-
-    def apply_map_axis_limits(self, ax, axis_points):
-        if len(axis_points) == 0:
-            return
-
-        lats = [point[0] for point in axis_points]
-        lons = [point[1] for point in axis_points]
-        min_lat = min(lats)
-        max_lat = max(lats)
-        min_lon = min(lons)
-        max_lon = max(lons)
-
-        lat_span = max_lat - min_lat
-        lon_span = max_lon - min_lon
-        min_span = 0.0001
-        if lat_span < min_span:
-            lat_padding = min_span / 2.0
-        else:
-            lat_padding = lat_span * 0.15
-
-        if lon_span < min_span:
-            lon_padding = min_span / 2.0
-        else:
-            lon_padding = lon_span * 0.15
-
-        ax.set_xlim(min_lon - lon_padding, max_lon + lon_padding)
-        ax.set_ylim(min_lat - lat_padding, max_lat + lat_padding)
-
     def save_detection_map(self):
+        # Salva una figura riassuntiva con safezone, oggetti finali e riferimenti manuali.
         final_boas, final_tubos = self.split_map_objects_by_type(self.object_list)
         reference_boas, reference_tubos = self.split_map_objects_by_type(MANUAL_REFERENCE_OBJECTS)
 
@@ -534,11 +416,33 @@ class GeolocalizationNode:
             self.plot_map_objects(ax, reference_boas, 'black', 'o', 'boa nota', facecolors='none')
             self.plot_map_objects(ax, reference_tubos, 'black', 's', 'tubo noto', facecolors='none')
 
-            axis_points = self.collect_map_axis_points(
-                [final_boas, final_tubos, reference_boas, reference_tubos],
-                [MANUAL_POLYGON_POINTS, self.safezone_polygon_points]
-            )
-            self.apply_map_axis_limits(ax, axis_points)
+            # Usa tutti i punti disponibili per impostare limiti coerenti della figura,
+            # evitando mappe troppo strette quando ci sono pochi oggetti.
+            axis_points = []
+            for object_group in [final_boas, final_tubos, reference_boas, reference_tubos]:
+                for map_object in object_group:
+                    axis_points.append((float(map_object['lat']), float(map_object['lon'])))
+
+            for polygon_group in [MANUAL_POLYGON_POINTS, self.safezone_polygon_points]:
+                for point in polygon_group:
+                    axis_points.append((float(point[0]), float(point[1])))
+
+            if len(axis_points) > 0:
+                lats = [point[0] for point in axis_points]
+                lons = [point[1] for point in axis_points]
+                min_lat = min(lats)
+                max_lat = max(lats)
+                min_lon = min(lons)
+                max_lon = max(lons)
+
+                lat_span = max_lat - min_lat
+                lon_span = max_lon - min_lon
+                min_span = 0.0001
+                lat_padding = min_span / 2.0 if lat_span < min_span else lat_span * 0.15
+                lon_padding = min_span / 2.0 if lon_span < min_span else lon_span * 0.15
+
+                ax.set_xlim(min_lon - lon_padding, max_lon + lon_padding)
+                ax.set_ylim(min_lat - lat_padding, max_lat + lat_padding)
 
             ax.set_xlabel('Longitude')
             ax.set_ylabel('Latitude')
@@ -564,21 +468,38 @@ class GeolocalizationNode:
     # ========================================================
 
     def geolocalize_detection(self, msg, object_index, image_width):
-        # xc e la coordinata across-track; yc identifica il ping dell immagine waterfall
+        # xc e' la coordinata across-track; yc identifica il ping dell'immagine waterfall
         centroid_x = float(msg.object_centroid_x_px[object_index])
         centroid_y = float(msg.object_centroid_y_px[object_index])
         row_index  = int(round(centroid_y))
 
         # convertire la coordinata x del centroide in distanza orizzontale sul fondale
         altitude_m = float(msg.altitudes[row_index])
-        ranges = self.centroid_x_to_ranges(centroid_x, image_width, altitude_m)
-        if ranges is None:
+        nadir_column = image_width / 2.0
+        bins_per_side = image_width / 2.0
+        if bins_per_side <= 0.0:
             return None
-        slant_range_m, ground_range_m = ranges
+
+        range_bin = abs(float(centroid_x) - nadir_column)
+        meters_per_pixel_slant = self.sonar_range_m / bins_per_side
+        slant_range_m = range_bin * meters_per_pixel_slant
+        if slant_range_m <= altitude_m:
+            rospy.logwarn("Detection in water-column/blind-zone: slant={:.3f} altitude={:.3f}".format(slant_range_m, altitude_m))
+            return None
+
+        # Proiezione sul fondale: ground^2 = slant^2 - altitude^2.
+        ground_range_m = math.sqrt((slant_range_m * slant_range_m) - (altitude_m * altitude_m))
 
         # sensor + conversioni body frame -> NED -> latitudine/longitudine
         nav_status = msg.nav_statuses[row_index]
-        body_position = self.ground_range_to_body_position(centroid_x, image_width, ground_range_m)
+        side = -1.0 if float(centroid_x) < nadir_column else 1.0
+        # Nel body frame x e l'offset longitudinale del sensore, y e la distanza
+        # laterale dal nadir piu l'offset fisico del sonar.
+        body_position = [
+            self.sensor_x_offset_m,
+            side * (self.sensor_y_offset_m + ground_range_m),
+            self.sensor_z_offset_m
+        ]
         north_m, east_m, down_m = self.body_to_ned(body_position, nav_status)
 
         object_latitude, object_longitude = ne2ll(
@@ -623,37 +544,9 @@ class GeolocalizationNode:
 
         return output, localization_info
 
-    def centroid_x_to_ranges(self, centroid_x, image_width, altitude_m):
-        # la colonna centrale rappresenta il nadir
-        nadir_column = image_width / 2.0
-        bins_per_side = image_width / 2.0
-        if bins_per_side <= 0.0:
-            return None
-
-        # ogni pixel x misura una distanza obliqua
-        range_bin = abs(float(centroid_x) - nadir_column)
-        meters_per_pixel_slant = self.sonar_range_m / bins_per_side
-        slant_range_m = range_bin * meters_per_pixel_slant
-        if slant_range_m <= altitude_m:
-            rospy.logwarn("Detection in water-column/blind-zone: slant={:.3f} altitude={:.3f}".format(slant_range_m, altitude_m))
-            return None
-
-        # proiezione sul fondale: ground^2 = slant^2 - altitude^2
-        ground_range_m = math.sqrt((slant_range_m * slant_range_m) - (altitude_m * altitude_m))
-        return slant_range_m, ground_range_m
-
-    def ground_range_to_body_position(self, centroid_x, image_width, ground_range_m):
-        # lato dell immagine rispetto al nadir
-        nadir_column = image_width / 2.0
-        side = -1.0 if float(centroid_x) < nadir_column else 1.0
-
-        # coordinate nel body frame: offset del sonar + distanza across-track sul fondale
-        x_body = self.sensor_x_offset_m
-        y_body = side * (self.sensor_y_offset_m + ground_range_m)
-        z_body = self.sensor_z_offset_m
-        return [x_body, y_body, z_body]
-
     def body_to_ned(self, body_position, nav_status):
+        # Converte un punto espresso nel frame body del veicolo nel frame NED locale
+        # usando roll, pitch e yaw disponibili nel messaggio di navigazione.
         # orientazione AUV
         roll  = float(nav_status.orientation.roll)
         pitch = float(nav_status.orientation.pitch)
@@ -670,17 +563,17 @@ class GeolocalizationNode:
 
         x_body, y_body, z_body = body_position
 
-        #north = (cy * cp) * x_body + (cy * sp * sr - sy * cr) * y_body + (cy * sp * cr + sy * sr) * z_body
-        #east = (sy * cp) * x_body + (sy * sp * sr + cy * cr) * y_body + (sy * sp * cr - cy * sr) * z_body
-        #down = (-sp) * x_body + (cp * sr) * y_body + (cp * cr) * z_body
+        north = (cy * cp) * x_body + (cy * sp * sr - sy * cr) * y_body + (cy * sp * cr + sy * sr) * z_body
+        east = (sy * cp) * x_body + (sy * sp * sr + cy * cr) * y_body + (sy * sp * cr - cy * sr) * z_body
+        down = (-sp) * x_body + (cp * sr) * y_body + (cp * cr) * z_body
 	
 
 	# matrice di rotazione body -> NED (yaw)
 	#x_body, y_body, z_body = body_position
 
-        north = math.cos(yaw) * x_body - math.sin(yaw) * y_body
-        east  = math.sin(yaw) * x_body + math.cos(yaw) * y_body
-        down  = z_body
+        #north = math.cos(yaw) * x_body - math.sin(yaw) * y_body
+        #east  = math.sin(yaw) * x_body + math.cos(yaw) * y_body
+        #down  = z_body
 
         return north, east, down
 

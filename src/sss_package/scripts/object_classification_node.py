@@ -18,7 +18,7 @@ from cv_bridge import CvBridge, CvBridgeError
 # CLASSE PRINCIPALE NODO LIST CREATOR
 # ============================================================
 class ObjectClassificationNode:
-    MAX_CLASSIFICATION_SCORE = 6.0
+    MAX_CLASSIFICATION_SCORE = 7.0
 
     def __init__(self):
 
@@ -81,6 +81,7 @@ class ObjectClassificationNode:
         self.tie_tube_min_area_m2          = float(rospy.get_param('~tie_tube_min_area_m2', 0.55))
         self.tie_tube_min_dimension_m      = float(rospy.get_param('~tie_tube_min_dimension_m', 2.0))
         self.tie_tube_min_aspect_ratio     = float(rospy.get_param('~tie_tube_min_aspect_ratio', 3.2))
+        self.tube_shadow_min_area_m2       = float(rospy.get_param('~tube_shadow_min_area_m2', 4.0))
         self.buoy_far_shadow_gap_m         = float(rospy.get_param('~buoy_far_shadow_gap_m', 2.0))
 
 
@@ -378,29 +379,29 @@ class ObjectClassificationNode:
         # parametri della soglia adattiva
         threshold_scale  = float(self.cfar_threshold_scale)
         threshold_offset = float(self.cfar_threshold_offset)
-        response = np.zeros_like(image_float, dtype=np.float32)
+        across_response = np.zeros_like(image_float, dtype=np.float32)
+        along_response = np.zeros_like(image_float, dtype=np.float32)
 
-        ## applicare CFAR riga per riga (across-track)
-        #for row in range(height):
-        #    data = image_float[row, :]
-        #    padded = np.pad(data, (radius, radius), mode='edge')
-        #
-        #    for col in range(width):		# col = CUT
-        #        center = col + radius
-        #
-        #        # celle training a sinistra e destra, escludendo le celle guard vicino al CUT
-        #        left_train  = padded[center - guard - train:center - guard]
-        #        right_train = padded[center + guard + 1:center + guard + train + 1]
-        #        training_cells = np.concatenate((left_train, right_train))
-        #
-        #        # soglia locale: campione ordinato scelto dal rank, scalato e traslato
-        #        noise_estimate = np.partition(training_cells, rank)[rank]
-        #        threshold = noise_estimate * threshold_scale + threshold_offset
-        #
-        #        # controllare se l'intensita' del CUT e' maggiore della soglia
-        #        # se il pixel e' maggiore della soglia, salvare quanto piu' forte e'
-        #        if data[col] > threshold:
-        #            response[row, col] = data[col] - threshold
+        # applicare CFAR riga per riga (across-track)
+        for row in range(height):
+            data = image_float[row, :]
+            padded = np.pad(data, (radius, radius), mode='edge')
+
+            for col in range(width):		# col = CUT
+                center = col + radius
+
+                # celle training a sinistra e destra, escludendo le celle guard vicino al CUT
+                left_train  = padded[center - guard - train:center - guard]
+                right_train = padded[center + guard + 1:center + guard + train + 1]
+                training_cells = np.concatenate((left_train, right_train))
+
+                # soglia locale: campione ordinato scelto dal rank, scalato e traslato
+                noise_estimate = np.partition(training_cells, rank)[rank]
+                threshold = noise_estimate * threshold_scale + threshold_offset
+
+                # se il pixel e' maggiore della soglia, salvare quanto piu' forte e'
+                if data[col] > threshold:
+                    across_response[row, col] = data[col] - threshold
 
         # applicare CFAR colonna per colonna (along-track)
         for col in range(width):
@@ -422,7 +423,10 @@ class ObjectClassificationNode:
                 # controllare se l'intensita' del CUT e' maggiore della soglia
                 # se il pixel e' maggiore della soglia, salvare quanto piu' forte e'
                 if data[row] > threshold:
-                    response[row, col] = data[row] - threshold
+                    along_response[row, col] = data[row] - threshold
+
+        # combinare le due direzioni senza richiedere che entrambe rilevino lo stesso pixel
+        response = np.maximum(across_response, along_response)
 
         # se nessun pixel e stato rilevato, restituire una mappa nera
         max_response = float(np.max(response))
@@ -667,14 +671,16 @@ class ObjectClassificationNode:
                 tube_score += 1.0
             if 0.8 <= shadow_ratio <= 4.0:
                 tube_score += 1.0
+            if shadow['area_m2'] >= self.tube_shadow_min_area_m2:
+                tube_score += 1.0
 
             # boa attesa: piu' compatta e con ombra abbastanza lunga rispetto all'oggetto
             buoy_score = pair_score
-            if 0.3 <= obj['max_dimension_m'] <= 2.7: #2.7 (1.9)
+            if 0.3 <= obj['max_dimension_m'] <= 2.7:
                 buoy_score += 1.0
             if 0.3 <= obj['min_dimension_m'] <= 1.2:
                 buoy_score += 1.0
-            if 1.0 <= obj['aspect_ratio'] <= 4.0:   #2.467 3.6 2.796 (2.0)
+            if 1.0 <= obj['aspect_ratio'] <= 4.0:
                 buoy_score += 1.0
             if 1.0 <= shadow_ratio <= 5.0:
                 buoy_score += 1.0
@@ -855,6 +861,7 @@ class ObjectClassificationNode:
                 text_file.write("tie_tube_min_area_m2: {:.3f}\n".format(self.tie_tube_min_area_m2))
                 text_file.write("tie_tube_min_dimension_m: {:.3f}\n".format(self.tie_tube_min_dimension_m))
                 text_file.write("tie_tube_min_aspect_ratio: {:.3f}\n".format(self.tie_tube_min_aspect_ratio))
+                text_file.write("tube_shadow_min_area_m2: {:.3f}\n".format(self.tube_shadow_min_area_m2))
                 text_file.write("buoy_far_shadow_gap_m: {:.3f}\n".format(self.buoy_far_shadow_gap_m))
 
                 if len(classifications) == 0:
