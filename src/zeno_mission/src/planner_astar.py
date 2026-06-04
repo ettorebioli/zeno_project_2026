@@ -25,7 +25,7 @@ EXTRA_SAFETY_MARGIN = 0.5 # Margine extra di sicurezza per ostacoli
 
 # --- PARAMETRI DI MISSIONE E SENSORI ---
 MAX_MISSION_DISTANCE = float('inf')  
-MIN_UNCOVERED_AREA = 5.0      
+MIN_UNCOVERED_AREA = 2.0      
 
 # Parametri FLS (Frontal Looking Sonar)
 FLS_MAX_RANGE = 10.0          # Metri massimi in avanti
