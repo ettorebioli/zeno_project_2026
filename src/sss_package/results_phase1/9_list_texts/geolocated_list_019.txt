@@ -1,0 +1,24 @@
+geolocated_objects_count: 1
+sonar_range_m: 25.000
+sensor_x_offset_m: 0.063
+sensor_y_offset_m: 0.354
+sensor_z_offset_m: 0.096
+
+OBJECT 1
+classification: tube
+confidence: 0.571
+latitude: 43.7065226863
+longitude: 10.4754878310
+ping_index: 1511
+ping_stamp: 363.318891360
+row_index: 64
+centroid_px: [1361.60, 63.99]
+bbox_px: [1331, 55, 71, 44]
+auv_latitude: 43.7064437595
+auv_longitude: 10.4754827565
+auv_yaw_rad: -1.517467
+altitude_m: 3.277
+slant_range_m: 9.040
+ground_range_m: 8.425
+body_position_m: [0.063, 8.779, 0.096]
+ned_offset_m: [8.769, 0.409, 0.135]

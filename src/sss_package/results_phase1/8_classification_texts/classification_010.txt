@@ -1,0 +1,80 @@
+image_index: 10
+detections_count: 1
+
+PROCESSING PARAMETERS
+log_filter_scale: 255.000
+median_kernel_size: 3
+gaussian_kernel_size: 5
+gaussian_sigma: 0.000
+clahe_clip_limit: 2.000
+clahe_tile_grid_size: 8
+bright_morph_first_open_kernel_size: 3
+bright_morph_first_close_kernel_size: 9
+bright_morph_final_open_kernel_size: 5
+bright_morph_final_close_kernel_size: 9
+bright_morph_iterations: 1
+dark_morph_first_open_kernel_size: 3
+dark_morph_first_close_kernel_width: 5
+dark_morph_first_close_kernel_height: 3
+dark_morph_iterations: 1
+saliency_percentile: 60.000
+cfar_train_cells: 18
+cfar_guard_cells: 10
+cfar_rank_percentile: 80.000
+cfar_threshold_scale: 1.000
+cfar_threshold_offset: 2.000
+bright_percentile: 85.000
+dark_percentile: 25.000
+sonar_range_m: 25.000
+sonar_bins_per_side: 1000
+sss_frequency_hz: 5.000
+alongtrack_beam_angle_deg: 0.300
+auv_velocity_mps: 0.179
+alongtrack_sampling_m: 0.035711
+alongtrack_beam_footprint_m: 0.130900
+meters_per_pixel_x: 0.025000
+meters_per_pixel_y: 0.130900
+nadir_column: center_of_image
+min_object_area_px: 30
+min_shadow_area_px: 30
+max_shadow_alongtrack_gap_m: 2.500
+max_shadow_accrosstrack_gap_m: 8.000
+min_classification_confidence: 0.350
+tie_buoy_max_area_m2: 0.450
+tie_buoy_max_dimension_m: 1.600
+tie_buoy_max_aspect_ratio: 3.200
+tie_tube_min_area_m2: 0.550
+tie_tube_min_dimension_m: 2.000
+tie_tube_min_aspect_ratio: 3.200
+tube_shadow_min_area_m2: 4.000
+buoy_far_shadow_gap_m: 2.000
+
+DETECTION 1
+classification: tube
+confidence: 0.429
+tube_score: 3.000
+buoy_score: 2.000
+pair_score: 1.000
+alongtrack_gap_m: 2.145
+acrosstrack_gap_m: 1.229
+tie_breaker: not_needed
+sss_state: ON
+isturning: false
+object_id: 1
+object_centroid_px: [762.89, 42.56]
+object_bbox_px: [733, 0, 62, 91]
+object_rotated_bbox_px: [[773, 96], [723, 6], [752, -11], [803, 80]]
+object_max_dimension_m: 11.815
+object_min_dimension_m: 0.957
+object_aspect_ratio: 12.341
+object_area_m2: 4.833
+object_angle_deg: -6.085
+shadow_id: 1
+shadow_centroid_px: [713.73, 26.17]
+shadow_bbox_px: [643, 0, 134, 67]
+shadow_rotated_bbox_px: [[741, 97], [642, 1], [687, -44], [785, 52]]
+shadow_max_dimension_m: 8.896
+shadow_min_dimension_m: 2.221
+shadow_aspect_ratio: 4.005
+shadow_area_m2: 12.270
+shadow_angle_deg: -8.151

@@ -1,0 +1,170 @@
+image_index: 24
+detections_count: 4
+
+PROCESSING PARAMETERS
+log_filter_scale: 255.000
+median_kernel_size: 3
+gaussian_kernel_size: 5
+gaussian_sigma: 0.000
+clahe_clip_limit: 2.000
+clahe_tile_grid_size: 8
+bright_morph_first_open_kernel_size: 3
+bright_morph_first_close_kernel_size: 9
+bright_morph_final_open_kernel_size: 5
+bright_morph_final_close_kernel_size: 9
+bright_morph_iterations: 1
+dark_morph_first_open_kernel_size: 3
+dark_morph_first_close_kernel_width: 5
+dark_morph_first_close_kernel_height: 3
+dark_morph_iterations: 1
+saliency_percentile: 60.000
+cfar_train_cells: 18
+cfar_guard_cells: 10
+cfar_rank_percentile: 80.000
+cfar_threshold_scale: 1.000
+cfar_threshold_offset: 2.000
+bright_percentile: 85.000
+dark_percentile: 25.000
+sonar_range_m: 25.000
+sonar_bins_per_side: 1000
+sss_frequency_hz: 5.000
+alongtrack_beam_angle_deg: 0.300
+auv_velocity_mps: 0.198
+alongtrack_sampling_m: 0.039689
+alongtrack_beam_footprint_m: 0.130900
+meters_per_pixel_x: 0.025000
+meters_per_pixel_y: 0.130900
+nadir_column: center_of_image
+min_object_area_px: 30
+min_shadow_area_px: 30
+max_shadow_alongtrack_gap_m: 2.500
+max_shadow_accrosstrack_gap_m: 8.000
+min_classification_confidence: 0.350
+tie_buoy_max_area_m2: 0.450
+tie_buoy_max_dimension_m: 1.600
+tie_buoy_max_aspect_ratio: 3.200
+tie_tube_min_area_m2: 0.550
+tie_tube_min_dimension_m: 2.000
+tie_tube_min_aspect_ratio: 3.200
+tube_shadow_min_area_m2: 4.000
+buoy_far_shadow_gap_m: 2.000
+
+DETECTION 1
+classification: tube
+confidence: 0.429
+tube_score: 3.000
+buoy_score: 1.000
+pair_score: 1.000
+alongtrack_gap_m: 1.261
+acrosstrack_gap_m: 1.396
+tie_breaker: not_needed
+sss_state: ON
+isturning: false
+object_id: 3
+object_centroid_px: [719.59, 49.45]
+object_bbox_px: [670, 13, 102, 77]
+object_rotated_bbox_px: [[675, 93], [660, 68], [765, 6], [779, 31]]
+object_max_dimension_m: 10.167
+object_min_dimension_m: 1.315
+object_aspect_ratio: 7.733
+object_area_m2: 5.360
+object_angle_deg: -73.812
+shadow_id: 7
+shadow_centroid_px: [663.74, 39.82]
+shadow_bbox_px: [577, 15, 174, 47]
+shadow_rotated_bbox_px: [[580, 75], [573, 36], [748, 5], [755, 44]]
+shadow_max_dimension_m: 7.063
+shadow_min_dimension_m: 2.861
+shadow_aspect_ratio: 2.469
+shadow_area_m2: 10.865
+shadow_angle_deg: -67.003
+
+DETECTION 2
+classification: buoy
+confidence: 0.571
+tube_score: 4.000
+buoy_score: 4.000
+pair_score: 2.000
+alongtrack_gap_m: 0.190
+acrosstrack_gap_m: 0.959
+tie_breaker: buoy_geometry_area
+sss_state: ON
+isturning: false
+object_id: 4
+object_centroid_px: [1492.13, 46.55]
+object_bbox_px: [1486, 43, 15, 10]
+object_rotated_bbox_px: [[1487, 53], [1484, 46], [1497, 40], [1500, 47]]
+object_max_dimension_m: 1.182
+object_min_dimension_m: 0.288
+object_aspect_ratio: 4.102
+object_area_m2: 0.198
+object_angle_deg: -83.463
+shadow_id: 14
+shadow_centroid_px: [1530.50, 48.00]
+shadow_bbox_px: [1495, 42, 72, 13]
+shadow_rotated_bbox_px: [[1495, 54], [1495, 42], [1566, 42], [1566, 54]]
+shadow_max_dimension_m: 1.676
+shadow_min_dimension_m: 1.590
+shadow_aspect_ratio: 1.054
+shadow_area_m2: 1.278
+shadow_angle_deg: -79.765
+
+DETECTION 3
+classification: buoy
+confidence: 0.714
+tube_score: 4.000
+buoy_score: 5.000
+pair_score: 2.000
+alongtrack_gap_m: 0.646
+acrosstrack_gap_m: 0.915
+tie_breaker: not_needed
+sss_state: ON
+isturning: false
+object_id: 5
+object_centroid_px: [1565.00, 93.00]
+object_bbox_px: [1556, 88, 19, 11]
+object_rotated_bbox_px: [[1556, 98], [1556, 88], [1574, 88], [1574, 98]]
+object_max_dimension_m: 1.325
+object_min_dimension_m: 0.412
+object_aspect_ratio: 3.217
+object_area_m2: 0.411
+object_angle_deg: -87.267
+shadow_id: 46
+shadow_centroid_px: [1601.59, 97.93]
+shadow_bbox_px: [1596, 95, 12, 8]
+shadow_rotated_bbox_px: [[1607, 102], [1595, 100], [1596, 94], [1608, 96]]
+shadow_max_dimension_m: 0.916
+shadow_min_dimension_m: 0.275
+shadow_aspect_ratio: 3.332
+shadow_area_m2: 0.100
+shadow_angle_deg: -0.000
+
+DETECTION 4
+classification: buoy
+confidence: 0.571
+tube_score: 4.000
+buoy_score: 4.000
+pair_score: 2.000
+alongtrack_gap_m: 0.469
+acrosstrack_gap_m: 1.462
+tie_breaker: buoy_geometry_area
+sss_state: ON
+isturning: false
+object_id: 7
+object_centroid_px: [1481.50, 111.00]
+object_bbox_px: [1473, 108, 18, 7]
+object_rotated_bbox_px: [[1474, 115], [1473, 112], [1489, 107], [1490, 110]]
+object_max_dimension_m: 0.843
+object_min_dimension_m: 0.195
+object_aspect_ratio: 4.318
+object_area_m2: 0.108
+object_angle_deg: -60.189
+shadow_id: 52
+shadow_centroid_px: [1539.99, 107.42]
+shadow_bbox_px: [1495, 101, 91, 16]
+shadow_rotated_bbox_px: [[1585, 116], [1495, 113], [1495, 99], [1585, 102]]
+shadow_max_dimension_m: 2.282
+shadow_min_dimension_m: 1.904
+shadow_aspect_ratio: 1.198
+shadow_area_m2: 1.764
+shadow_angle_deg: -80.100

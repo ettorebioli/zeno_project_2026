@@ -1,0 +1,43 @@
+geolocated_objects_count: 2
+sonar_range_m: 25.000
+sensor_x_offset_m: 0.063
+sensor_y_offset_m: 0.354
+sensor_z_offset_m: 0.096
+
+OBJECT 1
+classification: unknown
+confidence: 0.286
+latitude: 43.7068311095
+longitude: 10.4755191477
+ping_index: 625
+ping_stamp: 161.399094708
+row_index: 50
+centroid_px: [1687.21, 50.07]
+bbox_px: [1645, 23, 83, 49]
+auv_latitude: 43.7066780075
+auv_longitude: 10.4755464297
+auv_yaw_rad: -1.695675
+altitude_m: 3.605
+slant_range_m: 17.180
+ground_range_m: 16.798
+body_position_m: [0.063, 17.152, 0.096]
+ned_offset_m: [17.011, -2.199, 0.014]
+
+OBJECT 2
+classification: tube
+confidence: 0.857
+latitude: 43.7067120980
+longitude: 10.4755575614
+ping_index: 536
+ping_stamp: 142.806438110
+row_index: 139
+centroid_px: [1212.53, 138.88]
+bbox_px: [1197, 123, 29, 27]
+auv_latitude: 43.7066735359
+auv_longitude: 10.4755608779
+auv_yaw_rad: -1.618465
+altitude_m: 3.566
+slant_range_m: 5.313
+ground_range_m: 3.939
+body_position_m: [0.063, 4.293, 0.096]
+ned_offset_m: [4.285, -0.267, 0.121]
