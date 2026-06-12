@@ -1,8 +1,0 @@
-<launch>
-
-    <rosparam command="load" file="$(find zeno_sim_pkg)/config/params.yaml" />
-
-    <node name="zeno" pkg="zeno_sim_pkg" type="zeno_simulation.py" output="screen" />
-
-</launch>
-        
